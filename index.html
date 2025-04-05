@@ -109,6 +109,8 @@
         let canvas = null;
         let scanning = false;
         let stream = null;
+        let captureAttempts = 0;
+        const MAX_CAPTURE_ATTEMPTS = 10;
 
         // Configuración optimizada para OCR
         const OCR_CONFIG = {
@@ -226,7 +228,21 @@
                     
                     // Detener escaneo
                     stopScanning();
+                    return;
                 }
+                
+                // Incrementar intentos de captura
+                captureAttempts++;
+                
+                // Detener si se superan los intentos máximos
+                if (captureAttempts >= MAX_CAPTURE_ATTEMPTS) {
+                    statusDiv.textContent = 'No se pudo capturar el código';
+                    stopScanning();
+                    return;
+                }
+                
+                // Continuar procesando
+                requestAnimationFrame(processFrame);
             } catch (error) {
                 console.error('Error en procesamiento:', error);
                 statusDiv.textContent = 'Error de procesamiento';
@@ -237,6 +253,7 @@
         // Iniciar escaneo
         function startScanning() {
             scanning = true;
+            captureAttempts = 0;
             statusDiv.textContent = 'Escaneando...';
             captureButton.disabled = true;
             requestAnimationFrame(processFrame);

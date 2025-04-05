@@ -199,8 +199,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 1cm;
-            height: 0.5cm; /* Altura ajustada para proporción típica de UUID */
+            width: 240px; /* Suficiente ancho para 24 caracteres en fuente TrueType 14 */
+            height: 40px; /* Alto ajustado para capturar cómodamente el texto */
             border: 2px solid #2196F3;
             border-radius: 3px;
             box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
@@ -391,7 +391,7 @@
         <canvas id="canvas"></canvas>
         
         <div class="focus-rect" id="focusRect"></div>
-        <div class="focus-guide">Centra el UUID en el rectángulo azul</div>
+        <div class="focus-guide">Centra el UUID (hasta 24 caracteres) en el rectángulo azul</div>
         
         <div class="camera-actions">
             <button id="cancelButton" class="camera-button camera-cancel">
@@ -525,19 +525,9 @@
                 video.srcObject = stream;
                 cameraContainer.classList.add('visible');
                 
-                // Ajustar el tamaño y posición del rectángulo de enfoque según el tamaño real del dispositivo
-                // Este ajuste se hace cuando la cámara ya está activa para obtener dimensiones reales
-                video.onloadedmetadata = () => {
-                    const focusRect = document.getElementById('focusRect');
-                    
-                    // Asegurarnos de que el rectángulo realmente tenga 1cm de ancho
-                    // Convertir cm a px basado en la densidad de píxeles
-                    const cmToPx = 38; // Aproximadamente 38px = 1cm en la mayoría de dispositivos
-                    
-                    // Establecer ancho y alto del rectángulo de enfoque
-                    focusRect.style.width = `${cmToPx}px`;
-                    focusRect.style.height = `${cmToPx / 2}px`; // Altura proporcional para un UUID
-                };
+                // No necesitamos ajustar el tamaño ahora ya que usamos píxeles fijos
+                // para el rectángulo de enfoque, que ya está dimensionado para
+                // contener 24 caracteres con fuente TrueType 14
                 
             } catch (error) {
                 console.error('Error al acceder a la cámara:', error);
@@ -632,8 +622,8 @@
                 // Primero procesar el área recortada (más rápido y preciso)
                 const { data: croppedData } = await worker.recognize(croppedImageDataUrl);
                 
-                // Buscar un patrón de 16 caracteres alfanuméricos
-                const uuidPattern = /[0-9a-fA-F]{16}/gi;
+                // Buscar un patrón de 16 caracteres alfanuméricos (pero también permitir hasta 24)
+                const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
                 const croppedText = croppedData.text.replace(/\s+/g, ''); // Eliminar espacios
                 const croppedMatches = croppedText.match(uuidPattern);
                 
@@ -672,7 +662,7 @@
                         saveHistory();
                         renderHistory();
                     } else {
-                        alert('No se encontró ningún UUID de 16 caracteres en la imagen');
+                        alert('No se encontró ningún UUID válido en la imagen');
                     }
                 }
                 

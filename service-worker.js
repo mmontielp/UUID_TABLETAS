@@ -1,4 +1,3 @@
-/* service-worker.js */
 const CACHE_NAME = 'uuid-scanner-v1';
 const urlsToCache = [
     './',

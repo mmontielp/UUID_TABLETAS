@@ -381,19 +381,26 @@
             
             workerPromise.then(async worker => {
                 try {
-                    // Configurar para reconocer solo caracteres hexadecimales
+                    // Configurar para reconocer con alta precisión
                     await worker.loadLanguage('eng');
                     await worker.initialize('eng');
+                    
+                    // Configuración para mejorar la precisión sin usar reemplazos manuales
                     await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789abcdef',
+                        // Permitir todos los caracteres hexadecimales (no limitar)
                         tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                        tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
+                        // Usar modo Legacy que suele ser mejor para texto de fuente fija
+                        tessedit_ocr_engine_mode: 2,
+                        // Configurar para reconocimiento preciso aunque sea más lento
                         tessjs_create_hocr: '0',
                         tessjs_create_tsv: '0',
-                        tessjs_create_box: '0',
-                        tessjs_create_unlv: '0',
-                        tessjs_create_osd: '0',
+                        // Aumentar la precisión y quitar atajos
+                        tessedit_do_invert: '0',
+                        // Evitar correcciones automáticas del OCR
+                        language_model_penalty_non_dict_word: '0',
+                        language_model_penalty_non_freq_dict_word: '0',
                     });
+                    
                     updateStatus('OCR listo para capturar', 'info');
                 } catch (error) {
                     console.error('Error al inicializar Tesseract:', error);
@@ -607,15 +614,11 @@
                 // Realizar OCR en la imagen
                 const { data } = await worker.recognize(canvas);
                 
-                // Limpiar el texto reconocido - eliminar TODOS los caracteres no hexadecimales
+                // Limpiar el texto reconocido - eliminar caracteres no hexadecimales
                 let recognizedText = data.text.replace(/[^0-9a-f]/gi, '').toLowerCase();
                 
-                // Correcciones comunes: 1->f, g->9, pero solo si hay ambigüedad de acuerdo al contexto
-                if (recognizedText.includes('1') || recognizedText.includes('g')) {
-                    console.log("Texto original reconocido:", recognizedText);
-                    recognizedText = recognizedText.replace(/1/g, 'f').replace(/g/g, '9');
-                    console.log("Texto después de correcciones:", recognizedText);
-                }
+                // Mostrar el texto reconocido tal cual (sin reemplazos)
+                console.log("Texto reconocido:", recognizedText);
                 
                 // Si tenemos exactamente 16 caracteres y todos son hexadecimales válidos
                 if (recognizedText.length === 16 && /^[0-9a-f]+$/.test(recognizedText)) {
@@ -651,9 +654,6 @@
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
             
-            // Aumentar el contraste y convertir a blanco y negro con umbral adaptativo
-            const threshold = 128;
-            
             // Primer paso: Convertir a escala de grises y calcular el brillo promedio
             let totalBrightness = 0;
             let pixelValues = [];
@@ -662,21 +662,24 @@
                 const g = data[i + 1];
                 const b = data[i + 2];
                 
-                // Convertir a escala de grises con una ponderación que favorece la detección de texto
+                // Convertir a escala de grises con ponderación para mejor OCR
                 const gray = 0.299 * r + 0.587 * g + 0.114 * b;
                 pixelValues.push(gray);
                 totalBrightness += gray;
             }
             
-            // Calcular el brillo promedio y ajustar el umbral en consecuencia
+            // Calcular el brillo promedio y ajustar el umbral
             const avgBrightness = totalBrightness / pixelValues.length;
-            const adaptiveThreshold = avgBrightness * 0.9; // 10% menos que el promedio para preservar más detalles
             
-            // Segundo paso: Aplicar umbral adaptativo y mejorar bordes
+            // Determinar umbral basado en el brillo de la imagen
+            // Para imágenes más oscuras, usar un umbral más bajo para preservar caracteres
+            const adaptiveThreshold = avgBrightness < 128 ? avgBrightness * 0.8 : avgBrightness * 0.9;
+            
+            // Segundo paso: Aplicar el umbral adaptativo
             for (let i = 0, j = 0; i < data.length; i += 4, j++) {
                 const gray = pixelValues[j];
                 
-                // Aplicar umbral adaptativo
+                // Aplicar umbral para crear imagen binaria
                 const val = gray > adaptiveThreshold ? 255 : 0;
                 
                 data[i] = val;     // R
@@ -686,24 +689,52 @@
             
             ctx.putImageData(imageData, 0, 0);
             
+            // Aumentar tamaño y mejorar contraste
+            applyContrastEnhancement(canvas);
+        }
+        
+        // Función para mejorar el contraste y escalar la imagen
+        function applyContrastEnhancement(canvas) {
             // Aumentar tamaño del canvas para mejor reconocimiento
-            const scaleFactor = 2.0; // Aumentado de 1.5 a 2.0 para mayor detalle
+            const scaleFactor = 2.5; // Aumentado para mayor detalle
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = canvas.width * scaleFactor;
             tempCanvas.height = canvas.height * scaleFactor;
             
-            // Dibujar la imagen escalada con suavizado desactivado para texto más nítido
+            // Dibujar la imagen escalada sin suavizado para preservar bordes nítidos
             tempCtx.imageSmoothingEnabled = false;
             tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
             
             // Copiar de vuelta al canvas original
             canvas.width = tempCanvas.width;
             canvas.height = tempCanvas.height;
+            const ctx = canvas.getContext('2d');
             ctx.drawImage(tempCanvas, 0, 0);
             
-            // Almacenar una copia de la imagen procesada para depuración (opcional)
-            window.lastProcessedImage = canvas.toDataURL('image/png');
+            // Opcional: realizar ajustes adicionales de contraste o nitidez
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Aumento adicional de contraste para mejorar el reconocimiento
+            for (let i = 0; i < data.length; i += 4) {
+                // Si el pixel ya es blanco o negro, dejarlo así
+                if (data[i] === 255 || data[i] === 0) continue;
+                
+                // Para valores grises, aumentar el contraste
+                const val = data[i] < 128 ? 0 : 255;
+                data[i] = val;     // R
+                data[i + 1] = val; // G
+                data[i + 2] = val; // B
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Guardar la imagen procesada para depuración si es necesario
+            if (window.debugMode) {
+                window.processedImage = canvas.toDataURL('image/png');
+                console.log("Imagen procesada disponible en window.processedImage");
+            }
         }
         
         // Manejar cadena hexadecimal válida
@@ -793,6 +824,17 @@
             }
             
             captureHistory.innerHTML = '';
+            
+            // Encabezado para explicar el formato
+            const headerElement = document.createElement('div');
+            headerElement.className = 'history-header';
+            headerElement.innerHTML = '<span>Formato: [número]  [cadena hex]</span>';
+            headerElement.style.padding = '5px 10px';
+            headerElement.style.marginBottom = '10px';
+            headerElement.style.borderBottom = '1px solid #ddd';
+            headerElement.style.fontSize = '13px';
+            headerElement.style.color = '#666';
+            captureHistory.appendChild(headerElement);
             
             captures.forEach(capture => {
                 const item = document.createElement('div');

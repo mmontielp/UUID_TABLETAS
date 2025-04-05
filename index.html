@@ -370,6 +370,9 @@
                     if (message.status === 'recognizing text') {
                         updateStatus(`Reconociendo texto... ${Math.floor(message.progress * 100)}%`, 'info');
                     }
+                },
+                errorHandler: error => {
+                    console.error('Error en worker de Tesseract:', error);
                 }
             });
             
@@ -586,9 +589,7 @@
                 // Obtener el worker (ya inicializado)
                 const worker = await window.tesseractWorker;
                 
-                // Cada vez que se inicia un nuevo reconocimiento, reiniciar el worker
-                await worker.reset();
-                
+                // Como worker.reset() no está disponible, reinicializamos el worker completamente
                 // Volver a configurar el worker para asegurar que no haya contaminación entre ejecuciones
                 await worker.loadLanguage('eng');
                 await worker.initialize('eng');
@@ -800,7 +801,7 @@
                 const textDisplay = `${capture.number ? capture.number : 'Sin número'}  ${capture.hexCode}`;
                 
                 item.innerHTML = `
-                    <div class="history-content">${textDisplay}</div>
+                    <div class="history-content" title="${textDisplay}">${textDisplay}</div>
                     <div class="history-actions">
                         <button class="tooltip" onclick="copyToClipboard('${textDisplay}')">
                             📋

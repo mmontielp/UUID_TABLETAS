@@ -302,6 +302,7 @@
         // Variables globales
         let videoStream;
         let captures = [];
+        let isProcessing = false; // Flag para evitar múltiples capturas simultáneas
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureBtn = document.getElementById('captureBtn');
@@ -355,6 +356,12 @@
                 await worker.setParameters({
                     tessedit_char_whitelist: '0123456789abcdef',
                     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
+                    tessjs_create_hocr: '0',
+                    tessjs_create_tsv: '0',
+                    tessjs_create_box: '0',
+                    tessjs_create_unlv: '0',
+                    tessjs_create_osd: '0',
                 });
                 updateStatus('OCR listo para capturar', 'info');
             });
@@ -403,41 +410,57 @@
         
         // Capturar imagen de la webcam
         function captureImage() {
-            const cameraContainer = document.querySelector('.camera-container');
-            cameraContainer.classList.add('flash');
-            setTimeout(() => cameraContainer.classList.remove('flash'), 300);
+            // Evitar múltiples capturas simultáneas
+            if (isProcessing) {
+                return;
+            }
             
-            // Configurar canvas para capturar solo la zona del rectángulo
-            const ctx = canvas.getContext('2d');
-            const captureZone = document.querySelector('.capture-zone');
-            const rect = captureZone.getBoundingClientRect();
-            const videoRect = video.getBoundingClientRect();
+            isProcessing = true;
+            captureBtn.disabled = true;
             
-            // Calcular proporciones y coordenadas relativas
-            const scaleX = video.videoWidth / videoRect.width;
-            const scaleY = video.videoHeight / videoRect.height;
-            
-            const captureX = (rect.left - videoRect.left) * scaleX;
-            const captureY = (rect.top - videoRect.top) * scaleY;
-            const captureWidth = rect.width * scaleX;
-            const captureHeight = rect.height * scaleY;
-            
-            // Configurar tamaño del canvas
-            canvas.width = captureWidth;
-            canvas.height = captureHeight;
-            
-            // Dibujar solo la región de captura en el canvas
-            ctx.drawImage(
-                video, 
-                captureX, captureY, captureWidth, captureHeight, 
-                0, 0, captureWidth, captureHeight
-            );
-            
-            // Obtener la imagen capturada
-            const capturedImage = canvas.toDataURL('image/png');
-            
-            // Procesar la imagen con OCR
-            processWithOCR(canvas);
+            try {
+                const cameraContainer = document.querySelector('.camera-container');
+                cameraContainer.classList.add('flash');
+                setTimeout(() => cameraContainer.classList.remove('flash'), 300);
+                
+                // Configurar canvas para capturar solo la zona del rectángulo
+                const ctx = canvas.getContext('2d');
+                const captureZone = document.querySelector('.capture-zone');
+                const rect = captureZone.getBoundingClientRect();
+                const videoRect = video.getBoundingClientRect();
+                
+                // Calcular proporciones y coordenadas relativas
+                const scaleX = video.videoWidth / videoRect.width;
+                const scaleY = video.videoHeight / videoRect.height;
+                
+                const captureX = (rect.left - videoRect.left) * scaleX;
+                const captureY = (rect.top - videoRect.top) * scaleY;
+                const captureWidth = rect.width * scaleX;
+                const captureHeight = rect.height * scaleY;
+                
+                // Configurar tamaño del canvas
+                canvas.width = captureWidth;
+                canvas.height = captureHeight;
+                
+                // Dibujar solo la región de captura en el canvas
+                ctx.drawImage(
+                    video, 
+                    captureX, captureY, captureWidth, captureHeight, 
+                    0, 0, captureWidth, captureHeight
+                );
+                
+                // Procesar la imagen con OCR
+                processWithOCR(canvas).finally(() => {
+                    // Restablecer el estado de procesamiento
+                    isProcessing = false;
+                    captureBtn.disabled = false;
+                });
+            } catch (error) {
+                console.error("Error en captura:", error);
+                updateStatus("Error al capturar imagen: " + error.message, "error");
+                isProcessing = false;
+                captureBtn.disabled = false;
+            }
         }
         
         // Procesar imagen con OCR
@@ -445,6 +468,9 @@
             updateStatus('Procesando imagen con OCR...', 'info');
             
             try {
+                // Pre-procesar la imagen para mejorar el OCR
+                preprocessImage(canvas);
+                
                 // Obtener el worker (ya inicializado)
                 const worker = await window.tesseractWorker;
                 
@@ -454,23 +480,79 @@
                 // Limpiar el texto reconocido
                 let recognizedText = data.text.trim().toLowerCase().replace(/\s+/g, '');
                 
-                // Verificar si es una cadena hexadecimal válida
-                if (hexRegex.test(recognizedText)) {
+                // Correcciones comunes: 1->f, g->9
+                recognizedText = recognizedText.replace(/1/g, 'f').replace(/g/g, '9');
+                
+                console.log("Texto reconocido:", recognizedText);
+                
+                // Si tenemos exactamente 16 caracteres y todos son hexadecimales válidos
+                if (recognizedText.length === 16 && /^[0-9a-f]+$/.test(recognizedText)) {
                     handleValidHexCode(recognizedText);
-                } else {
-                    // Intentar encontrar subcadenas hexadecimales válidas
-                    const hexMatches = recognizedText.match(/[0-9a-f]{16}/g);
-                    if (hexMatches && hexMatches.length > 0) {
-                        handleValidHexCode(hexMatches[0]);
-                    } else {
-                        updateStatus(`No se detectó un código hexadecimal válido. Texto reconocido: ${recognizedText}`, 'error');
-                    }
+                    return;
                 }
+                
+                // Si el texto tiene más de 16 caracteres, tomar exactamente 16
+                if (recognizedText.length > 16 && /^[0-9a-f]+$/.test(recognizedText.substring(0, 16))) {
+                    handleValidHexCode(recognizedText.substring(0, 16));
+                    return;
+                }
+                
+                // Buscar cualquier secuencia de 16 caracteres hexadecimales
+                const hexMatches = recognizedText.match(/[0-9a-f]{16}/g);
+                if (hexMatches && hexMatches.length > 0) {
+                    handleValidHexCode(hexMatches[0]);
+                    return;
+                }
+                
+                // Si llegamos aquí, no se encontró un código válido
+                updateStatus(`No se detectó una cadena hexadecimal válida de 16 caracteres. Texto reconocido: ${recognizedText}`, 'error');
                 
             } catch (error) {
                 updateStatus(`Error en el procesamiento OCR: ${error.message}`, 'error');
                 console.error('Error en OCR:', error);
             }
+        }
+        
+        // Pre-procesar la imagen para mejorar el OCR
+        function preprocessImage(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Aumentar el contraste y convertir a blanco y negro
+            const threshold = 128;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                // Convertir a escala de grises
+                const gray = 0.3 * r + 0.59 * g + 0.11 * b;
+                
+                // Aplicar umbral para crear imagen binaria
+                const val = gray > threshold ? 255 : 0;
+                
+                data[i] = val;
+                data[i + 1] = val;
+                data[i + 2] = val;
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Aumentar tamaño del canvas para mejor reconocimiento
+            const scaleFactor = 1.5;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width * scaleFactor;
+            tempCanvas.height = canvas.height * scaleFactor;
+            
+            // Dibujar la imagen escalada
+            tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Copiar de vuelta al canvas original
+            canvas.width = tempCanvas.width;
+            canvas.height = tempCanvas.height;
+            ctx.drawImage(tempCanvas, 0, 0);
         }
         
         // Manejar cadena hexadecimal válida
@@ -504,19 +586,43 @@
         
         // Generar código QR
         function generateQRCode(text) {
+            // Asegurar que el contenedor esté vacío
             qrcodeContainer.innerHTML = '';
-            QRCode.toCanvas(qrcodeContainer, text, {
-                width: 200,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function (error) {
-                if (error) {
-                    console.error('Error al generar QR:', error);
-                }
-            });
+            
+            try {
+                // Crear elemento canvas para el QR
+                const canvas = document.createElement('canvas');
+                qrcodeContainer.appendChild(canvas);
+                
+                // Generar QR con configuración visible
+                QRCode.toCanvas(canvas, text, {
+                    width: 200,
+                    height: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    },
+                    errorCorrectionLevel: 'H'
+                }, function (error) {
+                    if (error) {
+                        console.error('Error al generar QR:', error);
+                        qrcodeContainer.innerHTML = '<p style="color: red;">Error al generar código QR</p>';
+                    }
+                });
+                
+                // Añadir texto debajo del QR
+                const label = document.createElement('p');
+                label.style.fontFamily = 'monospace';
+                label.style.marginTop = '10px';
+                label.style.wordBreak = 'break-all';
+                label.textContent = text;
+                qrcodeContainer.appendChild(label);
+                
+            } catch (error) {
+                console.error('Error en generación de QR:', error);
+                qrcodeContainer.innerHTML = '<p style="color: red;">Error al generar código QR: ' + error.message + '</p>';
+            }
         }
         
         // Mostrar resultado de captura

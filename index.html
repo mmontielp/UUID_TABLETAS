@@ -203,7 +203,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 190px; /* Aproximadamente 5cm en la mayoría de dispositivos */
-            height: 38px; /* Aproximadamente 1cm en la mayoría de dispositivos */
+            height: 76px; /* Aproximadamente 2cm en la mayoría de dispositivos */
             border: 2px solid #2196F3;
             border-radius: 3px;
             box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
@@ -880,22 +880,23 @@
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
                     
-                    // Aumentar el contraste y convertir a escala de grises para mejorar el OCR
+                    // Aumentar el contraste y mejorar la legibilidad
+                    const contrastFactor = 2; // Mayor contraste que antes
+                    const brightness = 10;    // Ligero aumento de brillo para texto oscuro
+                    
                     for (let i = 0; i < data.length; i += 4) {
-                        // Convertir a escala de grises con mayor peso al canal verde
-                        // ya que el ojo humano es más sensible a este canal
-                        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                        
-                        // Aumentar contraste
-                        const contrastFactor = 1.5; // Factor de contraste
-                        const contrast = (gray - 128) * contrastFactor + 128;
-                        
-                        // Umbrales adaptativos para texto oscuro sobre fondo claro
-                        const threshold = 140;
-                        const value = contrast > threshold ? 255 : 0;
-                        
-                        // Aplicar a todos los canales
-                        data[i] = data[i + 1] = data[i + 2] = value;
+                        // Ajustar brillo y contraste
+                        for (let j = 0; j < 3; j++) { // R, G, B channels
+                            // Aplicar contraste
+                            let value = data[i + j];
+                            value = ((value / 255 - 0.5) * contrastFactor + 0.5) * 255;
+                            
+                            // Aplicar brillo
+                            value += brightness;
+                            
+                            // Limitar valores a 0-255
+                            data[i + j] = Math.max(0, Math.min(255, value));
+                        }
                     }
                     
                     // Aplicar los cambios
@@ -959,3 +960,6 @@
     </script>
 </body>
 </html>
+
+
+

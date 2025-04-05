@@ -3,195 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#f44336">
     <title>Hex Scanner</title>
-    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhleGFkZWNpbWFsIFNjYW5uZXIiLAogICJzaG9ydF9uYW1lIjogIkhleClTY2FuIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwKICAidGhlbWVfY29sb3IiOiAiI2Y0NDMzNiIsCiAgImljb25zIjogW10KfQ==">
-    <script>
-        window.addEventListener('pageshow', function(event) {
-            if (event.persisted) {
-                window.location.reload();
-            }
-        });
-        if ('scrollRestoration' in history) {
-            history.scrollRestoration = 'manual';
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            height: 100vh; 
+            background: #f0f0f0;
         }
-    </script>
-    [Aquí va todo el CSS que está en el código anterior]
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .camera-section {
+            flex: 2;
+            position: relative;
+            background: black;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 30%;
+            border: 3px solid #ff0000;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        .qr-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            padding: 20px;
+        }
+        #qrCode {
+            max-width: 250px;
+            max-height: 250px;
+            margin-bottom: 20px;
+        }
+        #hexInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        #status {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.5/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
-    <header>
-        <h1>Escáner Hexadecimal</h1>
-    </header>
-    
-    <main>
-        <div id="notification" class="hidden"></div>
-        
-        <div class="camera-container">
+    <div class="container">
+        <div class="camera-section">
             <video id="video" autoplay playsinline></video>
             <div class="scanner-overlay"></div>
         </div>
-        
-        <div class="result-container">
-            <div id="status">Esperando cámara...</div>
-            <input type="text" id="hexInput" placeholder="Cadena hexadecimal (16 caracteres)" maxlength="16" pattern="[0-9a-f]{16}">
-            <div id="hexError" class="hex-error hidden">La cadena debe contener exactamente 16 caracteres hexadecimales (0-9, a-f).</div>
-            
-            <div class="control-buttons">
-                <button id="scanButton">Capturar</button>
-                <button id="generateButton" disabled>Generar QR</button>
-            </div>
-            
+        <div class="qr-section">
+            <div id="status">Escaneando...</div>
+            <input type="text" id="hexInput" placeholder="Código Hex" readonly>
             <div id="qrCode"></div>
         </div>
-    </main>
+    </div>
 
     <script>
-        // Variables globales
         const video = document.getElementById('video');
-        const scanButton = document.getElementById('scanButton');
-        const generateButton = document.getElementById('generateButton');
-        const hexInput = document.getElementById('hexInput');
-        const hexError = document.getElementById('hexError');
         const qrCodeDiv = document.getElementById('qrCode');
+        const hexInput = document.getElementById('hexInput');
         const statusDiv = document.getElementById('status');
-        const notificationDiv = document.getElementById('notification');
-        
-        let stream = null;
-        let scanning = false;
-        let isProcessing = false;
         let canvas = null;
-        
-        // Crear canvas para zoom
-        const zoomedDisplayCanvas = document.createElement('canvas');
-        zoomedDisplayCanvas.width = 400;
-        zoomedDisplayCanvas.height = 160;
-        zoomedDisplayCanvas.className = 'zoomed-display';
-        
-        // Preparar contenedor de zoom
-        function setupZoomContainer() {
-            const overlay = document.querySelector('.scanner-overlay');
-            if (!overlay) return null;
-            
-            const zoomViewContainer = document.createElement('div');
-            zoomViewContainer.className = 'zoom-view-container';
-            zoomViewContainer.style.position = 'absolute';
-            zoomViewContainer.style.top = '0';
-            zoomViewContainer.style.left = '0';
-            zoomViewContainer.style.width = '100%';
-            zoomViewContainer.style.height = '100%';
-            zoomViewContainer.style.overflow = 'hidden';
-            zoomViewContainer.style.display = 'none';
-            
-            zoomViewContainer.appendChild(zoomedDisplayCanvas);
-            overlay.appendChild(zoomViewContainer);
-            
-            return zoomViewContainer;
-        }
-        
+        let scanning = false;
+
+        // Configuración optimizada para OCR
+        const OCR_CONFIG = {
+            tessedit_char_whitelist: '0123456789abcdef',
+            tessedit_char_blacklist: 'gGiIlLoO',
+            tessjs_create_osd: '0',
+            tessedit_pageseg_mode: '7',
+            tessedit_ocr_engine_mode: '3'
+        };
+
         // Inicializar la aplicación
         async function init() {
             try {
-                setupZoomContainer();
-                hexInput.addEventListener('input', validateHexInput);
-                scanButton.addEventListener('click', toggleScan);
-                generateButton.addEventListener('click', generateQR);
-                await startCamera();
-            } catch (error) {
-                console.error('Error al inicializar:', error);
-                statusDiv.textContent = 'Error al inicializar: ' + error.message;
-            }
-        }
-        
-        // Iniciar la cámara
-        async function startCamera() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
+                // Preparar canvas
+                canvas = document.createElement('canvas');
+                
+                // Iniciar cámara
+                const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: 'environment',
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
-                    },
-                    audio: false
+                    }
                 });
                 
                 video.srcObject = stream;
-                statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
+                
+                // Comenzar escaneo automático
+                video.addEventListener('loadedmetadata', () => {
+                    requestAnimationFrame(processFrame);
+                });
             } catch (error) {
-                console.error('Error al acceder a la cámara:', error);
-                statusDiv.textContent = 'No se pudo acceder a la cámara: ' + error.message;
+                console.error('Error al iniciar:', error);
+                statusDiv.textContent = 'Error: ' + error.message;
             }
         }
-        
-        // Alternar escaneo
-        function toggleScan() {
-            if (scanning) {
-                stopScanning();
-            } else {
-                startScanning();
-            }
-        }
-        
-        // Iniciar escaneo
-        function startScanning() {
-            scanning = true;
-            isProcessing = false;
-            scanButton.textContent = 'Detener';
-            statusDiv.textContent = 'Capturando...';
-            
-            const zoomViewContainer = document.querySelector('.zoom-view-container');
-            if (zoomViewContainer) {
-                zoomViewContainer.style.display = 'block';
-            }
-            
-            if (!canvas) {
-                canvas = document.createElement('canvas');
-            }
-            
-            requestAnimationFrame(captureAndProcess);
-        }
-        
-        // Detener escaneo
-        function stopScanning() {
-            scanning = false;
-            isProcessing = false;
-            scanButton.textContent = 'Capturar';
-            statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
-            
-            const zoomViewContainer = document.querySelector('.zoom-view-container');
-            if (zoomViewContainer) {
-                zoomViewContainer.style.display = 'none';
-            }
-        }
-        
-        // Capturar y procesar imagen
-        async function captureAndProcess() {
-            if (!scanning) return;
-            
-            if (isProcessing) {
-                requestAnimationFrame(captureAndProcess);
+
+        // Procesar frame de video
+        async function processFrame() {
+            if (!scanning) {
+                requestAnimationFrame(processFrame);
                 return;
             }
-            
-            isProcessing = true;
-            
+
             try {
-                if (video.readyState < 2 || !scanning) {
-                    isProcessing = false;
-                    requestAnimationFrame(captureAndProcess);
-                    return;
-                }
-                
+                // Preparar canvas
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                
                 const ctx = canvas.getContext('2d');
+                
+                // Capturar frame
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
+                // Recortar región de interés
                 const videoRect = video.getBoundingClientRect();
                 const overlayRect = document.querySelector('.scanner-overlay').getBoundingClientRect();
                 
@@ -203,17 +152,7 @@
                 const cropWidth = Math.min(overlayRect.width * scaleX, canvas.width - cropX);
                 const cropHeight = Math.min(overlayRect.height * scaleY, canvas.height - cropY);
                 
-                const zoomViewContainer = document.querySelector('.zoom-view-container');
-                if (zoomViewContainer && zoomViewContainer.style.display !== 'none') {
-                    const zoomContext = zoomedDisplayCanvas.getContext('2d');
-                    
-                    zoomContext.drawImage(
-                        canvas, 
-                        cropX, cropY, cropWidth, cropHeight,
-                        0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height
-                    );
-                }
-                
+                // Crear canvas temporal para OCR
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = cropWidth;
                 tempCanvas.height = cropHeight;
@@ -221,112 +160,74 @@
                 tempCtx.drawImage(
                     canvas, 
                     cropX, cropY, cropWidth, cropHeight, 
-                    0, 0, cropWidth, cropHeight
+                    0, cropWidth, cropHeight
                 );
                 
-                statusDiv.textContent = 'Procesando imagen...';
-                
+                // Realizar OCR
+                statusDiv.textContent = 'Procesando...';
                 const result = await Tesseract.recognize(
                     tempCanvas, 
                     'eng', 
-                    {
-                        tessedit_char_whitelist: '0123456789abcdef',
-                        tessedit_char_blacklist: 'gGiIlLoO',
-                        tessjs_create_osd: '0',
-                        tessedit_pageseg_mode: '7',
-                        tessedit_ocr_engine_mode: '3'
-                    }
+                    OCR_CONFIG
                 );
                 
+                // Limpiar y procesar texto
                 let recognizedText = result.data.text.trim().toLowerCase()
                     .replace(/[\s\n\r]/g, '')
                     .replace(/[^0-9a-f]/g, '');
                 
-                if (recognizedText && recognizedText.length >= 16) {
+                // Procesar caracteres confusos
+                const characterMap = {
+                    'g': '9', 'i': '1', 'l': '1', 'o': '0', 
+                    'z': '2', 's': '5', 't': 'f', 'b': '6'
+                };
+                
+                recognizedText = recognizedText.split('').map(char => 
+                    characterMap[char] || char
+                ).join('');
+                
+                // Validar y procesar cadena hexadecimal
+                if (recognizedText.length >= 16) {
                     const hexString = recognizedText.substring(0, 16);
                     
+                    // Mostrar resultado
                     hexInput.value = hexString;
-                    validateHexInput();
+                    statusDiv.textContent = 'Código capturado';
                     
-                    stopScanning();
-                    generateQR();
-                    showNotification('¡Cadena hexadecimal detectada!');
-                    return;
+                    // Generar QR
+                    qrCodeDiv.innerHTML = '';
+                    new QRCode(qrCodeDiv, {
+                        text: hexString,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    
+                    // Detener escaneo
+                    scanning = false;
                 }
                 
-                isProcessing = false;
-                requestAnimationFrame(captureAndProcess);
-                
+                // Continuar procesando
+                requestAnimationFrame(processFrame);
             } catch (error) {
-                console.error('Error en captura:', error);
-                
-                isProcessing = false;
-                statusDiv.textContent = 'Error: ' + error.message;
-                
-                requestAnimationFrame(captureAndProcess);
+                console.error('Error en procesamiento:', error);
+                statusDiv.textContent = 'Error de procesamiento';
+                requestAnimationFrame(processFrame);
             }
         }
-        
-        // Validar entrada hexadecimal
-        function validateHexInput() {
-            const value = hexInput.value.trim().toLowerCase();
-            const isValid = /^[0-9a-f]{16}$/.test(value);
-            
-            if (value === '') {
-                hexError.classList.add('hidden');
-                generateButton.disabled = true;
-            } else if (!isValid) {
-                hexError.classList.remove('hidden');
-                generateButton.disabled = true;
-            } else {
-                hexError.classList.add('hidden');
-                generateButton.disabled = false;
-            }
+
+        // Iniciar escaneo
+        function startScanning() {
+            scanning = true;
+            statusDiv.textContent = 'Escaneando...';
         }
-        
-        // Generar código QR
-        function generateQR() {
-            const value = hexInput.value.trim();
-            
-            qrCodeDiv.innerHTML = '';
-            
-            new QRCode(qrCodeDiv, {
-                text: value,
-                width: 160,
-                height: 160,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-            
-            qrCodeDiv.style.display = 'block';
-            statusDiv.textContent = 'Código QR generado: ' + value;
-        }
-        
-        // Mostrar notificación
-        function showNotification(message) {
-            notificationDiv.textContent = message;
-            notificationDiv.className = 'success-notification';
-            
-            setTimeout(() => {
-                notificationDiv.className = 'hidden';
-            }, 5000);
-        }
-        
-        // Iniciar la aplicación cuando se cargue el DOM
-        document.addEventListener('DOMContentLoaded', init);
-        
-        // Manejar eventos de visibilidad de la página
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (scanning) {
-                    stopScanning();
-                }
-            } else {
-                if (!stream) {
-                    startCamera();
-                }
-            }
+
+        // Iniciar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
+            startScanning();
         });
     </script>
 </body>

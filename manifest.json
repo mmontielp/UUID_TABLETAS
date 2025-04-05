@@ -1,11 +1,11 @@
 {
-    "name": "Hex Scanner - Windows",
-    "short_name": "HexScan",
-    "description": "Captura cadenas hexadecimales desde webcam con OCR avanzado",
+    "name": "Escáner Hexadecimal - Mercadona",
+    "short_name": "HexScanM",
+    "description": "Herramienta para capturar códigos hexadecimales",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#ffffff",
-    "theme_color": "#2196F3",
+    "theme_color": "#00843D",
     "orientation": "any",
     "icons": [
       {

@@ -267,10 +267,9 @@
     </style>
 </head>
 <body>
-    <header>
-        <h1>Hex Scanner</h1>
-        <p>Capture cadenas hexadecimales desde su webcam con precisión</p>
-    </header>
+    <div class="mercadona-header">
+        <img src="https://www.mercadona.es/static/media/logo.f851f64f.svg" alt="Mercadona" class="mercadona-logo" onerror="this.onerror=null; this.src='/api/placeholder/180/60'; this.alt='Mercadona'">
+    </div>
     
     <div class="container">
         <div class="column main-column">
@@ -313,7 +312,7 @@
         </div>
         
         <div class="column sidebar">
-            <h2>Historial de Capturas</h2>
+            <h2 style="color: #00843D; border-bottom: 2px solid #00843D; padding-bottom: 8px;">Historial de Capturas</h2>
             <div id="captureHistory" class="capture-history">
                 <p style="text-align: center; color: #888; padding: 20px;">No hay capturas todavía</p>
             </div>
@@ -839,25 +838,45 @@
             captures.forEach(capture => {
                 const item = document.createElement('div');
                 item.className = 'history-item';
+                item.setAttribute('data-id', capture.id);
                 
                 const textDisplay = `${capture.number ? capture.number : 'Sin número'}  ${capture.hexCode}`;
                 
                 item.innerHTML = `
                     <div class="history-content" title="${textDisplay}">${textDisplay}</div>
                     <div class="history-actions">
-                        <button class="tooltip" onclick="copyToClipboard('${textDisplay}')">
+                        <button class="tooltip action-btn" onclick="copyToClipboard('${textDisplay}')">
                             📋
                             <span class="tooltiptext">Copiar</span>
                         </button>
-                        <button class="tooltip" onclick="generateQRCodeForItem('${capture.hexCode}')">
+                        <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}')">
                             🔄
                             <span class="tooltiptext">Generar QR</span>
+                        </button>
+                        <button class="tooltip action-btn danger" onclick="removeHistoryItem(${capture.id})">
+                            🗑️
+                            <span class="tooltiptext">Eliminar</span>
                         </button>
                     </div>
                 `;
                 
                 captureHistory.appendChild(item);
             });
+        }
+        
+        // Eliminar un elemento específico del historial
+        function removeHistoryItem(id) {
+            if (confirm('¿Está seguro que desea eliminar esta entrada del historial?')) {
+                captures = captures.filter(capture => capture.id !== id);
+                saveCapturesToStorage();
+                updateCaptureHistory();
+                
+                // Actualizar estado de los botones
+                downloadBtn.disabled = captures.length === 0;
+                clearHistoryBtn.disabled = captures.length === 0;
+                
+                updateStatus('Entrada eliminada del historial', 'info');
+            }
         }
         
         // Copiar texto al portapapeles

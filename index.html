@@ -8,19 +8,24 @@
         body { 
             font-family: Arial, sans-serif; 
             margin: 0; 
-            padding: 0; 
+            padding: 20px; 
             display: flex; 
-            height: 100vh; 
+            flex-direction: column;
+            align-items: center;
             background: #f0f0f0;
+            height: 100vh;
+            box-sizing: border-box;
         }
         .container {
             display: flex;
             width: 100%;
-            height: 100%;
+            max-width: 800px;
+            gap: 20px;
         }
         .camera-section {
-            flex: 2;
             position: relative;
+            width: 300px;
+            height: 200px;
             background: black;
         }
         #video {
@@ -40,7 +45,7 @@
             pointer-events: none;
         }
         .qr-section {
-            flex: 1;
+            flex-grow: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -58,10 +63,23 @@
             padding: 10px;
             margin-bottom: 10px;
             font-family: monospace;
+            text-align: center;
         }
-        #status {
+        #status, #captureButton {
             text-align: center;
             margin-bottom: 10px;
+        }
+        #captureButton {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #captureButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.5/tesseract.min.js"></script>
@@ -74,7 +92,8 @@
             <div class="scanner-overlay"></div>
         </div>
         <div class="qr-section">
-            <div id="status">Escaneando...</div>
+            <div id="status">Presiona Capturar</div>
+            <button id="captureButton">Capturar</button>
             <input type="text" id="hexInput" placeholder="Código Hex" readonly>
             <div id="qrCode"></div>
         </div>
@@ -85,8 +104,11 @@
         const qrCodeDiv = document.getElementById('qrCode');
         const hexInput = document.getElementById('hexInput');
         const statusDiv = document.getElementById('status');
+        const captureButton = document.getElementById('captureButton');
+        
         let canvas = null;
         let scanning = false;
+        let stream = null;
 
         // Configuración optimizada para OCR
         const OCR_CONFIG = {
@@ -104,32 +126,29 @@
                 canvas = document.createElement('canvas');
                 
                 // Iniciar cámara
-                const stream = await navigator.mediaDevices.getUserMedia({
+                stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     }
                 });
                 
                 video.srcObject = stream;
                 
-                // Comenzar escaneo automático
-                video.addEventListener('loadedmetadata', () => {
-                    requestAnimationFrame(processFrame);
-                });
+                // Habilitar botón de captura
+                captureButton.disabled = false;
+                statusDiv.textContent = 'Cámara lista. Presiona Capturar';
             } catch (error) {
                 console.error('Error al iniciar:', error);
                 statusDiv.textContent = 'Error: ' + error.message;
+                captureButton.disabled = true;
             }
         }
 
         // Procesar frame de video
         async function processFrame() {
-            if (!scanning) {
-                requestAnimationFrame(processFrame);
-                return;
-            }
+            if (!scanning) return;
 
             try {
                 // Preparar canvas
@@ -160,7 +179,7 @@
                 tempCtx.drawImage(
                     canvas, 
                     cropX, cropY, cropWidth, cropHeight, 
-                    0, cropWidth, cropHeight
+                    0, 0, cropWidth, cropHeight
                 );
                 
                 // Realizar OCR
@@ -206,15 +225,12 @@
                     });
                     
                     // Detener escaneo
-                    scanning = false;
+                    stopScanning();
                 }
-                
-                // Continuar procesando
-                requestAnimationFrame(processFrame);
             } catch (error) {
                 console.error('Error en procesamiento:', error);
                 statusDiv.textContent = 'Error de procesamiento';
-                requestAnimationFrame(processFrame);
+                stopScanning();
             }
         }
 
@@ -222,13 +238,22 @@
         function startScanning() {
             scanning = true;
             statusDiv.textContent = 'Escaneando...';
+            captureButton.disabled = true;
+            requestAnimationFrame(processFrame);
         }
 
+        // Detener escaneo
+        function stopScanning() {
+            scanning = false;
+            statusDiv.textContent = 'Captura completada';
+            captureButton.disabled = false;
+        }
+
+        // Configurar evento de captura
+        captureButton.addEventListener('click', startScanning);
+
         // Iniciar cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', () => {
-            init();
-            startScanning();
-        });
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

@@ -350,20 +350,28 @@
             window.tesseractWorker = workerPromise;
             
             workerPromise.then(async worker => {
-                // Configurar para reconocer solo caracteres hexadecimales
-                await worker.loadLanguage('eng');
-                await worker.initialize('eng');
-                await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789abcdef',
-                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    tessjs_create_box: '0',
-                    tessjs_create_unlv: '0',
-                    tessjs_create_osd: '0',
-                });
-                updateStatus('OCR listo para capturar', 'info');
+                try {
+                    // Configurar para reconocer solo caracteres hexadecimales
+                    await worker.loadLanguage('eng');
+                    await worker.initialize('eng');
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789abcdef',
+                        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+                        tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
+                        tessjs_create_hocr: '0',
+                        tessjs_create_tsv: '0',
+                        tessjs_create_box: '0',
+                        tessjs_create_unlv: '0',
+                        tessjs_create_osd: '0',
+                    });
+                    updateStatus('OCR listo para capturar', 'info');
+                } catch (error) {
+                    console.error('Error al inicializar Tesseract:', error);
+                    updateStatus('Error al inicializar OCR. Recargue la página.', 'error');
+                }
+            }).catch(error => {
+                console.error('Error en la creación del worker de Tesseract:', error);
+                updateStatus('Error en el sistema OCR. Recargue la página.', 'error');
             });
         }
         
@@ -423,8 +431,11 @@
                 cameraContainer.classList.add('flash');
                 setTimeout(() => cameraContainer.classList.remove('flash'), 300);
                 
-                // Configurar canvas para capturar solo la zona del rectángulo
+                // Limpiar completamente el canvas antes de cada captura
                 const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Configurar canvas para capturar solo la zona del rectángulo
                 const captureZone = document.querySelector('.capture-zone');
                 const rect = captureZone.getBoundingClientRect();
                 const videoRect = video.getBoundingClientRect();
@@ -438,7 +449,7 @@
                 const captureWidth = rect.width * scaleX;
                 const captureHeight = rect.height * scaleY;
                 
-                // Configurar tamaño del canvas
+                // Configurar tamaño del canvas - asegurarse de que se resetea cada vez
                 canvas.width = captureWidth;
                 canvas.height = captureHeight;
                 
@@ -474,16 +485,35 @@
                 // Obtener el worker (ya inicializado)
                 const worker = await window.tesseractWorker;
                 
+                // Cada vez que se inicia un nuevo reconocimiento, reiniciar el worker
+                await worker.reset();
+                
+                // Volver a configurar el worker para asegurar que no haya contaminación entre ejecuciones
+                await worker.loadLanguage('eng');
+                await worker.initialize('eng');
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789abcdef',
+                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
+                    tessjs_create_hocr: '0',
+                    tessjs_create_tsv: '0',
+                    tessjs_create_box: '0',
+                    tessjs_create_unlv: '0',
+                    tessjs_create_osd: '0',
+                });
+                
                 // Realizar OCR en la imagen
                 const { data } = await worker.recognize(canvas);
                 
-                // Limpiar el texto reconocido
-                let recognizedText = data.text.trim().toLowerCase().replace(/\s+/g, '');
+                // Limpiar el texto reconocido - eliminar TODOS los caracteres no hexadecimales
+                let recognizedText = data.text.replace(/[^0-9a-f]/gi, '').toLowerCase();
                 
-                // Correcciones comunes: 1->f, g->9
-                recognizedText = recognizedText.replace(/1/g, 'f').replace(/g/g, '9');
-                
-                console.log("Texto reconocido:", recognizedText);
+                // Correcciones comunes: 1->f, g->9, pero solo si hay ambigüedad de acuerdo al contexto
+                if (recognizedText.includes('1') || recognizedText.includes('g')) {
+                    console.log("Texto original reconocido:", recognizedText);
+                    recognizedText = recognizedText.replace(/1/g, 'f').replace(/g/g, '9');
+                    console.log("Texto después de correcciones:", recognizedText);
+                }
                 
                 // Si tenemos exactamente 16 caracteres y todos son hexadecimales válidos
                 if (recognizedText.length === 16 && /^[0-9a-f]+$/.test(recognizedText)) {

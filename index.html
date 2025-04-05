@@ -420,7 +420,9 @@
                     tessedit_char_blacklist: 'gGiIlLoO',  // Evitar confusiones comunes
                     tessedit_enable_dict_correction: '0', // Evitar correcciones de diccionario
                     tessedit_pageseg_mode: '7',           // Tratarlo como una línea de texto
-                    tessjs_image_pre_multiplier: '2'      // Aumentar resolución para mejor reconocimiento
+                    tessedit_ocr_engine_mode: '2',        // Usar LSTM para mejor precisión
+                    tessjs_image_pre_multiplier: '2',     // Aumentar resolución para mejor reconocimiento
+                    tessjs_create_box: '1'                // Crear datos de caja para mejor análisis
                 });
                 
                 // Extraer el texto reconocido y limpiarlo
@@ -437,7 +439,20 @@
                     .replace(/o/g, '0')  // Corregir 'o' confundida con '0'
                     .replace(/z/g, '2')  // Corregir 'z' confundida con '2'
                     .replace(/s/g, '5')  // Corregir 's' confundida con '5'
-                    .replace(/t/g, 'f'); // Corregir 't' confundida con 'f'
+                    .replace(/t/g, 'f')  // Corregir 't' confundida con 'f'
+                    .replace(/B/g, '8')  // Corregir 'B' confundida con '8'
+                    .replace(/b/g, '6')  // Corregir 'b' confundida con '6'
+                    
+                // Correcciones adicionales para 8 y 9
+                // Si hay algún carácter ambiguo entre 8 y 9, analizamos el contexto
+                recognizedText = recognizedText.replace(/[8B]/g, (match, index, string) => {
+                    // Si parece un 8, lo dejamos como 8
+                    return '8';
+                });
+                recognizedText = recognizedText.replace(/[9g]/g, (match, index, string) => {
+                    // Si parece un 9, lo dejamos como 9
+                    return '9';
+                });
                 
                 // Filtrar solo caracteres hexadecimales
                 recognizedText = recognizedText.replace(/[^0-9a-f]/g, '');
@@ -451,14 +466,24 @@
                         hexInput.value = recognizedText;
                         validateHexInput();
                         
-                        // Detener el escaneo inmediatamente para evitar más capturas mientras se procesa
+                        // Detener el escaneo inmediatamente
                         scanning = false;
+                        scanButton.textContent = 'Capturar';
+                        
+                        // Ocultar vista ampliada
+                        if (zoomedDisplayCanvas) {
+                            zoomedDisplayCanvas.style.display = 'none';
+                        }
                         
                         // Mostrar notificación de éxito
                         showNotification('¡Cadena hexadecimal detectada con éxito!');
                         
-                        // Generar QR automáticamente - esto también detiene la captura
+                        // Generar QR automáticamente
                         generateQR();
+                        
+                        // Actualizar estado
+                        statusDiv.textContent = 'Captura completada. Código QR generado.';
+                        
                         return;
                     } else if (recognizedText.length > 16) {
                         // Si hay más de 16 caracteres, tomamos los primeros 16
@@ -489,7 +514,7 @@
                 
                 // Reintentar si todavía está en modo escaneo
                 if (scanning) {
-                    setTimeout(captureAndProcess, 300);
+                    requestAnimationFrame(captureAndProcess);
                 }
             }
         }

@@ -1,0 +1,653 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UUID OCR a QR</title>
+    <meta name="description" content="Escanea UUIDs con OCR y genera códigos QR">
+    <meta name="theme-color" content="#2196F3">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f9f9f9;
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background-color: #2196F3;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        main {
+            flex: 1;
+            padding: 1rem;
+            max-width: 500px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .scan-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            cursor: pointer;
+            margin: 1.5rem 0;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        
+        .scan-button:active {
+            transform: scale(0.98);
+            background-color: #1976D2;
+        }
+        
+        .scan-button i {
+            margin-right: 8px;
+        }
+        
+        .result-container {
+            display: none;
+            margin-top: 1.5rem;
+        }
+        
+        .result-container.visible {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .uuid-display {
+            background-color: #f0f8ff;
+            border: 1px solid #cce5ff;
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin: 0.5rem 0 1rem;
+            font-family: monospace;
+            font-size: 1.1rem;
+            word-break: break-all;
+            text-align: center;
+        }
+        
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+        
+        .qr-code {
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 100%;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .action-button {
+            flex: 1;
+            background-color: #f5f5f5;
+            color: #333;
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .action-button i {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .action-button.share {
+            background-color: #e3f2fd;
+            color: #1976D2;
+        }
+        
+        .action-button.copy {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .info-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin: 1rem 0;
+        }
+        
+        .camera-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            z-index: 1000;
+        }
+        
+        .camera-container.visible {
+            display: block;
+        }
+        
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        #canvas {
+            display: none;
+        }
+        
+        .camera-actions {
+            position: absolute;
+            bottom: 2rem;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            padding: 0 1rem;
+        }
+        
+        .camera-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .camera-capture {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: white;
+            border: 3px solid #2196F3;
+            cursor: pointer;
+        }
+        
+        .camera-capture::after {
+            content: '';
+            display: block;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background-color: #2196F3;
+            transition: transform 0.1s;
+        }
+        
+        .camera-capture:active::after {
+            transform: scale(0.9);
+        }
+        
+        .camera-cancel {
+            font-size: 1.5rem;
+            color: #f44336;
+        }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+        }
+        
+        .loading-overlay.visible {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .history-card {
+            margin-top: 2rem;
+        }
+        
+        .history-list {
+            list-style: none;
+            margin-top: 1rem;
+        }
+        
+        .history-item {
+            padding: 0.8rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-uuid {
+            font-family: monospace;
+            flex: 1;
+        }
+        
+        .history-time {
+            color: #999;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+        
+        .empty-history {
+            text-align: center;
+            color: #999;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>UUID Scanner a QR</h1>
+    </header>
+    
+    <main>
+        <div class="card">
+            <p class="info-text">Escanea un UUID de 16 caracteres desde la pantalla y genera su código QR</p>
+            
+            <button id="scanButton" class="scan-button">
+                <i class="fas fa-camera"></i> Escanear UUID
+            </button>
+            
+            <div id="resultContainer" class="result-container">
+                <h2>UUID escaneado:</h2>
+                <div id="uuidDisplay" class="uuid-display"></div>
+                
+                <div class="qr-container">
+                    <div id="qrCode" class="qr-code"></div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="copyButton" class="action-button copy">
+                        <i class="fas fa-copy"></i>
+                        Copiar
+                    </button>
+                    <button id="shareButton" class="action-button share">
+                        <i class="fas fa-share-alt"></i>
+                        Compartir
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card history-card">
+            <h2>Historial reciente</h2>
+            <ul id="historyList" class="history-list">
+                <li class="empty-history">No hay registros recientes</li>
+            </ul>
+        </div>
+    </main>
+    
+    <div id="cameraContainer" class="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        
+        <div class="camera-actions">
+            <button id="cancelButton" class="camera-button camera-cancel">
+                <i class="fas fa-times"></i>
+            </button>
+            <button id="captureButton" class="camera-capture"></button>
+        </div>
+    </div>
+    
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Procesando imagen...</p>
+    </div>
+    
+    <!-- Tesseract.js para OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    
+    <!-- QRCode.js para generar códigos QR -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    
+    <script>
+        // Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registrado'))
+                    .catch(err => console.error('Error al registrar Service Worker:', err));
+            });
+        }
+        
+        // Elementos del DOM
+        const scanButton = document.getElementById('scanButton');
+        const resultContainer = document.getElementById('resultContainer');
+        const uuidDisplay = document.getElementById('uuidDisplay');
+        const qrCode = document.getElementById('qrCode');
+        const copyButton = document.getElementById('copyButton');
+        const shareButton = document.getElementById('shareButton');
+        const cameraContainer = document.getElementById('cameraContainer');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('captureButton');
+        const cancelButton = document.getElementById('cancelButton');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const historyList = document.getElementById('historyList');
+        
+        // Variables de estado
+        let currentUuid = '';
+        let scanHistory = [];
+        
+        // Inicializar la aplicación
+        function init() {
+            loadHistory();
+            setupEventListeners();
+        }
+        
+        // Configurar eventos
+        function setupEventListeners() {
+            scanButton.addEventListener('click', startCamera);
+            captureButton.addEventListener('click', captureImage);
+            cancelButton.addEventListener('click', stopCamera);
+            copyButton.addEventListener('click', copyUuidToClipboard);
+            shareButton.addEventListener('click', shareUuid);
+        }
+        
+        // Cargar historial
+        function loadHistory() {
+            const savedHistory = localStorage.getItem('uuidScanHistory');
+            if (savedHistory) {
+                scanHistory = JSON.parse(savedHistory);
+                renderHistory();
+            }
+        }
+        
+        // Guardar historial
+        function saveHistory() {
+            // Mantener solo los últimos 10 elementos
+            if (scanHistory.length > 10) {
+                scanHistory = scanHistory.slice(0, 10);
+            }
+            localStorage.setItem('uuidScanHistory', JSON.stringify(scanHistory));
+        }
+        
+        // Renderizar historial
+        function renderHistory() {
+            if (scanHistory.length === 0) {
+                historyList.innerHTML = '<li class="empty-history">No hay registros recientes</li>';
+                return;
+            }
+            
+            historyList.innerHTML = '';
+            scanHistory.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'history-item';
+                li.innerHTML = `
+                    <span class="history-uuid">${item.uuid}</span>
+                    <span class="history-time">${formatDate(item.timestamp)}</span>
+                    <i class="fas fa-qrcode"></i>
+                `;
+                li.addEventListener('click', () => {
+                    showResult(item.uuid);
+                });
+                historyList.appendChild(li);
+            });
+        }
+        
+        // Formato de fecha
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        // Iniciar cámara
+        async function startCamera() {
+            try {
+                // Validar soporte
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert('Tu navegador no soporta acceso a la cámara');
+                    return;
+                }
+                
+                // Configurar cámara
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                cameraContainer.classList.add('visible');
+                
+            } catch (error) {
+                console.error('Error al acceder a la cámara:', error);
+                alert('No se pudo acceder a la cámara: ' + error.message);
+            }
+        }
+        
+        // Detener cámara
+        function stopCamera() {
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            cameraContainer.classList.remove('visible');
+        }
+        
+        // Capturar imagen
+        function captureImage() {
+            // Configurar canvas
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            
+            canvas.width = videoWidth;
+            canvas.height = videoHeight;
+            
+            // Dibujar video en canvas
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+            
+            // Convertir a URL de datos
+            const imageDataUrl = canvas.toDataURL('image/jpeg');
+            
+            // Iniciar procesamiento de OCR
+            processImage(imageDataUrl);
+        }
+        
+        // Procesar imagen con OCR
+        async function processImage(imageDataUrl) {
+            loadingOverlay.classList.add('visible');
+            
+            try {
+                // Detener cámara mientras procesamos
+                stopCamera();
+                
+                // Configurar Tesseract con idioma inglés
+                const worker = await Tesseract.createWorker({
+                    logger: m => console.log(m)
+                });
+                
+                await worker.loadLanguage('eng');
+                await worker.initialize('eng');
+                
+                // Mejorar reconocimiento para caracteres alfanuméricos
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789abcdefABCDEF',
+                });
+                
+                // Procesar imagen
+                const { data } = await worker.recognize(imageDataUrl);
+                await worker.terminate();
+                
+                // Buscar un patrón de 16 caracteres alfanuméricos
+                const uuidPattern = /[0-9a-fA-F]{16}/gi;
+                const allText = data.text.replace(/\s+/g, ''); // Eliminar espacios
+                const matches = allText.match(uuidPattern);
+                
+                if (matches && matches.length > 0) {
+                    showResult(matches[0]);
+                    
+                    // Guardar en historial
+                    scanHistory.unshift({
+                        uuid: matches[0],
+                        timestamp: new Date().toISOString()
+                    });
+                    saveHistory();
+                    renderHistory();
+                } else {
+                    alert('No se encontró ningún UUID de 16 caracteres en la imagen');
+                }
+                
+            } catch (error) {
+                console.error('Error en OCR:', error);
+                alert('Error al procesar la imagen: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('visible');
+            }
+        }
+        
+        // Mostrar resultado
+        function showResult(uuid) {
+            currentUuid = uuid;
+            uuidDisplay.textContent = uuid;
+            generateQRCode(uuid);
+            resultContainer.classList.add('visible');
+        }
+        
+        // Generar código QR
+        function generateQRCode(text) {
+            // Limpiar contenedor
+            qrCode.innerHTML = '';
+            
+            // Generar QR
+            QRCode.toCanvas(qrCode, text, {
+                width: 200,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) console.error('Error al generar QR:', error);
+            });
+        }
+        
+        // Copiar UUID al portapapeles
+        function copyUuidToClipboard() {
+            if (!currentUuid) return;
+            
+            navigator.clipboard.writeText(currentUuid)
+                .then(() => {
+                    // Feedback visual
+                    copyButton.innerHTML = '<i class="fas fa-check"></i>Copiado';
+                    setTimeout(() => {
+                        copyButton.innerHTML = '<i class="fas fa-copy"></i>Copiar';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Error al copiar:', err);
+                    alert('No se pudo copiar al portapapeles');
+                });
+        }
+        
+        // Compartir UUID
+        function shareUuid() {
+            if (!currentUuid) return;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'UUID Escaneado',
+                    text: currentUuid
+                }).catch(error => {
+                    console.log('Error al compartir:', error);
+                });
+            } else {
+                copyUuidToClipboard();
+                alert('Función de compartir no disponible en este navegador. UUID copiado al portapapeles.');
+            }
+        }
+        
+        // Iniciar la app
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

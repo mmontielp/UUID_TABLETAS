@@ -194,6 +194,31 @@
             display: none;
         }
         
+        .focus-rect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 1cm;
+            height: 0.5cm; /* Altura ajustada para proporción típica de UUID */
+            border: 2px solid #2196F3;
+            border-radius: 3px;
+            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+        }
+        
+        .focus-guide {
+            position: absolute;
+            bottom: 20%;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            z-index: 1001;
+        }
+        
         .camera-actions {
             position: absolute;
             bottom: 2rem;
@@ -365,6 +390,9 @@
         <video id="video" autoplay playsinline></video>
         <canvas id="canvas"></canvas>
         
+        <div class="focus-rect" id="focusRect"></div>
+        <div class="focus-guide">Centra el UUID en el rectángulo azul</div>
+        
         <div class="camera-actions">
             <button id="cancelButton" class="camera-button camera-cancel">
                 <i class="fas fa-times"></i>
@@ -497,6 +525,20 @@
                 video.srcObject = stream;
                 cameraContainer.classList.add('visible');
                 
+                // Ajustar el tamaño y posición del rectángulo de enfoque según el tamaño real del dispositivo
+                // Este ajuste se hace cuando la cámara ya está activa para obtener dimensiones reales
+                video.onloadedmetadata = () => {
+                    const focusRect = document.getElementById('focusRect');
+                    
+                    // Asegurarnos de que el rectángulo realmente tenga 1cm de ancho
+                    // Convertir cm a px basado en la densidad de píxeles
+                    const cmToPx = 38; // Aproximadamente 38px = 1cm en la mayoría de dispositivos
+                    
+                    // Establecer ancho y alto del rectángulo de enfoque
+                    focusRect.style.width = `${cmToPx}px`;
+                    focusRect.style.height = `${cmToPx / 2}px`; // Altura proporcional para un UUID
+                };
+                
             } catch (error) {
                 console.error('Error al acceder a la cámara:', error);
                 alert('No se pudo acceder a la cámara: ' + error.message);
@@ -522,19 +564,52 @@
             canvas.width = videoWidth;
             canvas.height = videoHeight;
             
-            // Dibujar video en canvas
+            // Dibujar video completo en canvas primero
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
             
-            // Convertir a URL de datos
-            const imageDataUrl = canvas.toDataURL('image/jpeg');
+            // Calcular las coordenadas del rectángulo de enfoque
+            const focusRect = document.getElementById('focusRect');
+            const rectPosition = focusRect.getBoundingClientRect();
             
-            // Iniciar procesamiento de OCR
-            processImage(imageDataUrl);
+            // Calcular la posición del rectángulo en relación con el video
+            const videoPosition = video.getBoundingClientRect();
+            
+            // Calcular la escala entre el tamaño real del video y cómo se muestra
+            const scaleX = videoWidth / videoPosition.width;
+            const scaleY = videoHeight / videoPosition.height;
+            
+            // Calcular las coordenadas del área de recorte en el espacio del video
+            const cropX = (rectPosition.left - videoPosition.left) * scaleX;
+            const cropY = (rectPosition.top - videoPosition.top) * scaleY;
+            const cropWidth = rectPosition.width * scaleX;
+            const cropHeight = rectPosition.height * scaleY;
+            
+            // Crear un segundo canvas para el área recortada
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = cropWidth;
+            cropCanvas.height = cropHeight;
+            const cropCtx = cropCanvas.getContext('2d');
+            
+            // Dibujar solo el área del rectángulo de enfoque
+            cropCtx.drawImage(
+                canvas, 
+                cropX, cropY, cropWidth, cropHeight, 
+                0, 0, cropWidth, cropHeight
+            );
+            
+            // Convertir a URL de datos
+            const croppedImageDataUrl = cropCanvas.toDataURL('image/jpeg');
+            
+            // También guardar la imagen completa como respaldo
+            const fullImageDataUrl = canvas.toDataURL('image/jpeg');
+            
+            // Iniciar procesamiento de OCR en el área recortada primero
+            processImage(croppedImageDataUrl, fullImageDataUrl);
         }
         
         // Procesar imagen con OCR
-        async function processImage(imageDataUrl) {
+        async function processImage(croppedImageDataUrl, fullImageDataUrl) {
             loadingOverlay.classList.add('visible');
             
             try {
@@ -554,27 +629,51 @@
                     tessedit_char_whitelist: '0123456789abcdefABCDEF',
                 });
                 
-                // Procesar imagen
-                const { data } = await worker.recognize(imageDataUrl);
-                await worker.terminate();
+                // Primero procesar el área recortada (más rápido y preciso)
+                const { data: croppedData } = await worker.recognize(croppedImageDataUrl);
                 
                 // Buscar un patrón de 16 caracteres alfanuméricos
                 const uuidPattern = /[0-9a-fA-F]{16}/gi;
-                const allText = data.text.replace(/\s+/g, ''); // Eliminar espacios
-                const matches = allText.match(uuidPattern);
+                const croppedText = croppedData.text.replace(/\s+/g, ''); // Eliminar espacios
+                const croppedMatches = croppedText.match(uuidPattern);
                 
-                if (matches && matches.length > 0) {
-                    showResult(matches[0]);
+                // Si encontramos coincidencias en el área recortada, usamos esa
+                if (croppedMatches && croppedMatches.length > 0) {
+                    await worker.terminate();
+                    showResult(croppedMatches[0]);
                     
                     // Guardar en historial
                     scanHistory.unshift({
-                        uuid: matches[0],
+                        uuid: croppedMatches[0],
                         timestamp: new Date().toISOString()
                     });
                     saveHistory();
                     renderHistory();
-                } else {
-                    alert('No se encontró ningún UUID de 16 caracteres en la imagen');
+                } 
+                // Como respaldo, intentar con la imagen completa si no hay coincidencias en el área recortada
+                else {
+                    // Reintentar con la imagen completa
+                    console.log("No se encontró UUID en el área enfocada, intentando con la imagen completa...");
+                    
+                    const { data: fullData } = await worker.recognize(fullImageDataUrl);
+                    await worker.terminate();
+                    
+                    const fullText = fullData.text.replace(/\s+/g, '');
+                    const fullMatches = fullText.match(uuidPattern);
+                    
+                    if (fullMatches && fullMatches.length > 0) {
+                        showResult(fullMatches[0]);
+                        
+                        // Guardar en historial
+                        scanHistory.unshift({
+                            uuid: fullMatches[0],
+                            timestamp: new Date().toISOString()
+                        });
+                        saveHistory();
+                        renderHistory();
+                    } else {
+                        alert('No se encontró ningún UUID de 16 caracteres en la imagen');
+                    }
                 }
                 
             } catch (error) {
@@ -651,3 +750,27 @@
     </script>
 </body>
 </html>
+
+/* manifest.json */
+{
+    "name": "UUID Scanner a QR",
+    "short_name": "UUID Scan",
+    "description": "Escanea UUIDs con OCR y genera códigos QR",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#2196F3",
+    "icons": [
+        {
+            "src": "icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
+

@@ -71,6 +71,7 @@
             height: 2cm;
             border: 2px solid var(--primary-color);
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            overflow: hidden; /* Para contener la vista ampliada */
         }
         
         .result-container {
@@ -231,6 +232,9 @@
                 scanButton.addEventListener('click', toggleScan);
                 generateButton.addEventListener('click', generateQR);
                 
+                // Configurar la vista ampliada en el rectángulo
+                const zoomViewContainer = setupEnhancedOverlay();
+                
                 // Intentar iniciar la cámara automáticamente
                 await startCamera();
                 
@@ -279,39 +283,33 @@
         zoomedDisplayCanvas.className = 'zoomed-display';
         let zoomContext = null;
         
-        // Ajustar zoom de la región de interés (rectángulo rojo)
-        function createZoomedView(videoElem, captureRect, scale = 1.5) {
-            if (!zoomContext) {
-                // Configurar el canvas de visualización ampliada solo la primera vez
-                document.querySelector('.camera-container').appendChild(zoomedDisplayCanvas);
-                zoomContext = zoomedDisplayCanvas.getContext('2d');
-                
-                // Establecer estilo del canvas
-                zoomedDisplayCanvas.style.position = 'absolute';
-                zoomedDisplayCanvas.style.bottom = '5px';
-                zoomedDisplayCanvas.style.right = '5px';
-                zoomedDisplayCanvas.style.width = '100px';
-                zoomedDisplayCanvas.style.height = '40px';
-                zoomedDisplayCanvas.style.border = '1px solid #fff';
-                zoomedDisplayCanvas.style.backgroundColor = '#000';
-                zoomedDisplayCanvas.width = 200;
-                zoomedDisplayCanvas.height = 80;
-            }
+        // Ajustar estilo del rectángulo rojo para incluir vista ampliada
+        function setupEnhancedOverlay() {
+            const overlay = document.querySelector('.scanner-overlay');
+            if (!overlay) return;
             
-            // Tamaño de la región a capturar (rectángulo rojo)
-            const sourceWidth = captureRect.width;
-            const sourceHeight = captureRect.height;
+            // Añadir un contenedor para la vista ampliada dentro del rectángulo
+            const zoomViewContainer = document.createElement('div');
+            zoomViewContainer.className = 'zoom-view-container';
+            zoomViewContainer.style.position = 'absolute';
+            zoomViewContainer.style.top = '0';
+            zoomViewContainer.style.left = '0';
+            zoomViewContainer.style.width = '100%';
+            zoomViewContainer.style.height = '100%';
+            zoomViewContainer.style.overflow = 'hidden';
+            zoomViewContainer.style.display = 'none'; // Inicialmente oculto
             
-            // Centro de la región
-            const sourceX = captureRect.x;
-            const sourceY = captureRect.y;
+            // Añadir canvas para la vista ampliada
+            zoomViewContainer.appendChild(zoomedDisplayCanvas);
+            zoomedDisplayCanvas.style.width = '100%';
+            zoomedDisplayCanvas.style.height = '100%';
+            zoomedDisplayCanvas.width = 400;  // Tamaño interno del canvas
+            zoomedDisplayCanvas.height = 160;
             
-            // Dibujar la región ampliada
-            zoomContext.drawImage(
-                videoElem,
-                sourceX, sourceY, sourceWidth, sourceHeight,  // Región fuente
-                0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height  // Destino completo
-            );
+            // Añadir al rectángulo rojo
+            overlay.appendChild(zoomViewContainer);
+            
+            return zoomViewContainer;
         }
         
         // Detener la cámara
@@ -344,9 +342,10 @@
             scanButton.textContent = 'Detener';
             statusDiv.textContent = 'Capturando...';
             
-            // Mostrar vista ampliada
-            if (zoomedDisplayCanvas) {
-                zoomedDisplayCanvas.style.display = 'block';
+            // Mostrar vista ampliada dentro del rectángulo
+            const zoomViewContainer = document.querySelector('.zoom-view-container');
+            if (zoomViewContainer) {
+                zoomViewContainer.style.display = 'block';
             }
             
             // Crear canvas para capturar la imagen si no existe
@@ -358,7 +357,6 @@
             Tesseract.terminate();
             
             // Iniciar el proceso de captura
-            // Usar requestAnimationFrame para mayor fluidez
             requestAnimationFrame(captureAndProcess);
         }
             
@@ -374,8 +372,9 @@
             statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
             
             // Ocultar vista ampliada
-            if (zoomedDisplayCanvas) {
-                zoomedDisplayCanvas.style.display = 'none';
+            const zoomViewContainer = document.querySelector('.zoom-view-container');
+            if (zoomViewContainer) {
+                zoomViewContainer.style.display = 'none';
             }
             
             // Cancelar cualquier reconocimiento en curso
@@ -440,14 +439,35 @@
                 const cropWidth = overlayRect.width * scaleX;
                 const cropHeight = overlayRect.height * scaleY;
                 
-                // Crear vista ampliada para visualización al usuario
+                // Crear vista ampliada dentro del rectángulo rojo
                 if (scanning) {
-                    createZoomedView(video, {
-                        x: cropX,
-                        y: cropY,
-                        width: cropWidth,
-                        height: cropHeight
-                    });
+                    const zoomViewContainer = document.querySelector('.zoom-view-container');
+                    if (zoomViewContainer && zoomViewContainer.style.display !== 'none') {
+                        if (!zoomContext) {
+                            zoomContext = zoomedDisplayCanvas.getContext('2d');
+                        }
+                        
+                        // Dibujar directamente la imagen capturada en el canvas de zoom
+                        zoomContext.drawImage(
+                            video,
+                            cropX, cropY, cropWidth, cropHeight,  // Región fuente
+                            0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height  // Destino completo
+                        );
+                        
+                        // Aplicar efecto de mejora de contraste para mejor visualización
+                        const zoomImageData = zoomContext.getImageData(0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height);
+                        const zoomData = zoomImageData.data;
+                        
+                        // Aumentar contraste para mejor visualización
+                        for (let i = 0; i < zoomData.length; i += 4) {
+                            // Aplicar ajuste de brillo y contraste
+                            zoomData[i] = Math.min(255, zoomData[i] * 1.2);     // R
+                            zoomData[i + 1] = Math.min(255, zoomData[i + 1] * 1.2); // G
+                            zoomData[i + 2] = Math.min(255, zoomData[i + 2] * 1.2); // B
+                        }
+                        
+                        zoomContext.putImageData(zoomImageData, 0, 0);
+                    }
                 }
                 
                 // Extraer la región de interés
@@ -531,8 +551,9 @@
                         scanButton.textContent = 'Capturar';
                         
                         // Ocultar vista ampliada
-                        if (zoomedDisplayCanvas) {
-                            zoomedDisplayCanvas.style.display = 'none';
+                        const zoomViewContainer = document.querySelector('.zoom-view-container');
+                        if (zoomViewContainer) {
+                            zoomViewContainer.style.display = 'none';
                         }
                         
                         // Mostrar notificación de éxito

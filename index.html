@@ -2,170 +2,58 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UUID OCR a QR</title>
-    <meta name="description" content="Escanea UUIDs con OCR y genera códigos QR">
-    <meta name="theme-color" content="#2196F3">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f44336">
+    <title>Hex Scanner</title>
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhleGFkZWNpbWFsIFNjYW5uZXIiLAogICJzaG9ydF9uYW1lIjogIkhleClTY2FuIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwKICAidGhlbWVfY29sb3IiOiAiI2Y0NDMzNiIsCiAgImljb25zIjogW10KfQ==">
     <style>
+        :root {
+            --primary-color: #f44336;
+            --text-color: #333;
+            --background-color: #f5f5f5;
+        }
+        
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         
         body {
-            background-color: #f9f9f9;
-            color: #333;
-            line-height: 1.6;
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
         
         header {
-            background-color: #2196F3;
+            background-color: var(--primary-color);
             color: white;
             padding: 1rem;
             text-align: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            font-size: 1.3rem;
-            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         main {
             flex: 1;
-            padding: 1rem;
-            max-width: 500px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        .card {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .scan-button {
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            padding: 0.8rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 500;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            width: 100%;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            margin: 1.5rem 0;
-        }
-        
-        .scan-button:active {
-            transform: scale(0.98);
-        }
-        
-        .scan-button i {
-            margin-right: 8px;
-        }
-        
-        .result-container {
-            display: none;
-            margin-top: 1.5rem;
-        }
-        
-        .result-container.visible {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .uuid-display {
-            background-color: #f0f8ff;
-            border: 1px solid #cce5ff;
-            border-radius: 8px;
-            padding: 0.8rem;
-            margin: 0.5rem 0 1rem;
-            font-family: monospace;
-            font-size: 1.1rem;
-            word-break: break-all;
-            text-align: center;
-        }
-        
-        .qr-container {
-            display: flex;
-            justify-content: center;
-            margin: 1rem 0;
-        }
-        
-        .qr-code {
             padding: 1rem;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            max-width: 100%;
-        }
-        
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            margin-top: 1rem;
-        }
-        
-        .action-button {
-            background-color: #f5f5f5;
-            color: #333;
-            border: none;
-            border-radius: 8px;
-            padding: 0.6rem 1rem;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .action-button i {
-            font-size: 1rem;
-            margin-right: 0.5rem;
-        }
-        
-        .action-button.copy {
-            background-color: #e8f5e9;
-            color: #2e7d32;
+            overflow-y: auto;
         }
         
         .camera-container {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+            position: relative;
             width: 100%;
-            height: 100%;
-            background-color: black;
-            z-index: 1000;
-        }
-        
-        .camera-container.visible {
-            display: block;
+            max-width: 500px;
+            height: 300px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            background-color: #000;
         }
         
         #video {
@@ -174,579 +62,399 @@
             object-fit: cover;
         }
         
-        #canvas {
-            display: none;
-        }
-        
-        .focus-rect {
+        .scanner-overlay {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 190px; /* Aproximadamente 5cm en la mayoría de dispositivos */
-            height: 114px; /* Aproximadamente 3cm en la mayoría de dispositivos */
-            border: 2px solid #2196F3;
-            border-radius: 3px;
-            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
-            z-index: 1001;
+            width: 5cm;
+            height: 2cm;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
         }
         
-        .focus-guide {
-            position: absolute;
-            bottom: 20%;
-            left: 0;
-            right: 0;
-            text-align: center;
-            color: white;
-            font-size: 14px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            z-index: 1001;
-        }
-        
-        .camera-actions {
-            position: absolute;
-            bottom: 2rem;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            padding: 0 1rem;
-        }
-        
-        .camera-button {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        
-        .camera-capture {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: white;
-            border: 3px solid #2196F3;
-            cursor: pointer;
-        }
-        
-        .camera-capture::after {
-            content: '';
-            display: block;
-            width: 54px;
-            height: 54px;
-            border-radius: 50%;
-            background-color: #2196F3;
-            transition: transform 0.1s;
-        }
-        
-        .camera-capture:active::after {
-            transform: scale(0.9);
-        }
-        
-        .camera-cancel {
-            font-size: 1.5rem;
-            color: #f44336;
-        }
-        
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+        .result-container {
             width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            z-index: 2000;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            color: white;
+            max-width: 500px;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         
-        .loading-overlay.visible {
-            display: flex;
-        }
-        
-        .loading-spinner {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top: 4px solid white;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+        #hexInput {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1.2rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             margin-bottom: 1rem;
+            font-family: monospace;
         }
         
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        #qrCode {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+        
+        #qrCode img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        button {
+            padding: 0.75rem 1rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+        }
+        
+        .hex-error {
+            color: var(--primary-color);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .success-notification {
+            background-color: #4CAF50;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            text-align: center;
+            animation: fadeOut 3s forwards;
+            animation-delay: 2s;
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        @media (max-width: 600px) {
+            .camera-container {
+                height: 40vh;
+            }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.5/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <header>
-        <h1>UUID Scanner a QR</h1>
+        <h1>Escáner Hexadecimal</h1>
     </header>
     
     <main>
-        <div class="card">
-            <button id="scanButton" class="scan-button">
-                <i class="fas fa-camera"></i> Escanear UUID
-            </button>
+        <div id="notification" class="hidden"></div>
+        
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="scanner-overlay"></div>
+        </div>
+        
+        <div class="result-container">
+            <div id="status">Esperando cámara...</div>
+            <input type="text" id="hexInput" placeholder="Cadena hexadecimal (16 caracteres)" maxlength="16" pattern="[0-9a-f]{16}">
+            <div id="hexError" class="hex-error hidden">La cadena debe contener exactamente 16 caracteres hexadecimales (0-9, a-f).</div>
             
-            <div id="resultContainer" class="result-container">
-                <h2>UUID escaneado:</h2>
-                <div id="uuidDisplay" class="uuid-display"></div>
-                
-                <div class="qr-container">
-                    <div id="qrCode" class="qr-code"></div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button id="copyButton" class="action-button copy">
-                        <i class="fas fa-copy"></i>
-                        Copiar
-                    </button>
-                </div>
+            <div id="qrCode"></div>
+            
+            <div class="control-buttons">
+                <button id="scanButton">Escanear</button>
+                <button id="generateButton" disabled>Generar QR</button>
             </div>
         </div>
     </main>
-    
-    <div id="cameraContainer" class="camera-container">
-        <video id="video" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
-        
-        <div class="focus-rect" id="focusRect"></div>
-        <div class="focus-guide">Centra el UUID (16 caracteres) en el rectángulo azul</div>
-        
-        <div class="camera-actions">
-            <button id="cancelButton" class="camera-button camera-cancel">
-                <i class="fas fa-times"></i>
-            </button>
-            <button id="captureButton" class="camera-capture"></button>
-        </div>
-    </div>
-    
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p>Procesando imagen...</p>
-    </div>
-    
-    <!-- Tesseract.js para OCR -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    
-    <!-- QRCode.js para generar códigos QR -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-    
+
     <script>
-        // Service Worker para PWA
+        // Variables globales
+        const video = document.getElementById('video');
+        const scanButton = document.getElementById('scanButton');
+        const generateButton = document.getElementById('generateButton');
+        const hexInput = document.getElementById('hexInput');
+        const hexError = document.getElementById('hexError');
+        const qrCodeDiv = document.getElementById('qrCode');
+        const statusDiv = document.getElementById('status');
+        const notificationDiv = document.getElementById('notification');
+        
+        let stream = null;
+        let qrCode = null;
+        let scanning = false;
+        let canvas = null;
+        let qrInstance = null;
+        
+        // Comprobar si el navegador soporta Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(reg => console.log('Service Worker registrado'))
-                    .catch(err => console.error('Error al registrar Service Worker:', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.log('Service Worker registro fallido:', err);
+                });
             });
         }
         
-        // Elementos del DOM
-        const scanButton = document.getElementById('scanButton');
-        const resultContainer = document.getElementById('resultContainer');
-        const uuidDisplay = document.getElementById('uuidDisplay');
-        const qrCode = document.getElementById('qrCode');
-        const copyButton = document.getElementById('copyButton');
-        const cameraContainer = document.getElementById('cameraContainer');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const captureButton = document.getElementById('captureButton');
-        const cancelButton = document.getElementById('cancelButton');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Variable de estado
-        let currentUuid = '';
-        
         // Inicializar la aplicación
-        function init() {
-            setupEventListeners();
+        async function init() {
+            try {
+                // Configurar el escucha para validar la entrada
+                hexInput.addEventListener('input', validateHexInput);
+                
+                // Configurar botones
+                scanButton.addEventListener('click', toggleScan);
+                generateButton.addEventListener('click', generateQR);
+                
+                // Intentar iniciar la cámara automáticamente
+                await startCamera();
+            } catch (error) {
+                console.error('Error al inicializar:', error);
+                statusDiv.textContent = 'Error al inicializar la cámara: ' + error.message;
+            }
         }
         
-        // Configurar eventos
-        function setupEventListeners() {
-            scanButton.addEventListener('click', startCamera);
-            captureButton.addEventListener('click', captureImage);
-            cancelButton.addEventListener('click', stopCamera);
-            copyButton.addEventListener('click', copyUuidToClipboard);
-        }
-        
-        // Iniciar cámara
+        // Iniciar la cámara
         async function startCamera() {
             try {
-                // Validar soporte
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    alert('Tu navegador no soporta acceso a la cámara');
-                    return;
-                }
-                
-                // Configurar cámara optimizada para iOS
-                const constraints = {
+                // Solicitar permisos de cámara con restricciones
+                stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: 'environment', // Usar cámara trasera
-                        width: { ideal: 1920 },    // Alta resolución para mejor OCR
-                        height: { ideal: 1080 },
-                        // Estos ajustes pueden mejorar la captura en iOS
-                        zoom: 1.0,                 // Sin zoom inicial
-                        focusMode: 'continuous',   // Enfoque automático continuo
-                        exposureMode: 'continuous', // Exposición automática continua
-                        whiteBalanceMode: 'continuous'
-                    }
-                };
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
                 
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                // Asignar el stream al elemento de video
                 video.srcObject = stream;
                 
-                // Esperar a que el video esté listo
-                video.onloadeddata = () => {
-                    // En iOS, aplicar algunos ajustes adicionales para prevenir problemas comunes
-                    video.setAttribute('playsinline', true);  // Fundamental para iOS
-                    video.setAttribute('autoplay', true);
-                    video.muted = true;
-                    
-                    // Mostrar la interfaz de la cámara
-                    cameraContainer.classList.add('visible');
-                    
-                    // Añadir instrucciones específicas para iOS para mejor experiencia
-                    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-                        const focusGuide = document.querySelector('.focus-guide');
-                        focusGuide.innerHTML = 'Centra el UUID en el rectángulo y mantén el iPhone estable. <br>Asegúrate de tener buena iluminación.';
-                    }
-                };
-                
-                // Manejar eventos de errores de reproducción (comunes en iOS)
-                video.onerror = (error) => {
-                    console.error('Error de reproducción de video:', error);
-                    alert('Error al iniciar la cámara. Intenta reiniciar la aplicación.');
-                    stopCamera();
-                };
-                
-                // Manejar errores de track (también comunes en iOS)
-                stream.getVideoTracks().forEach(track => {
-                    track.onended = () => {
-                        console.log('La cámara se detuvo inesperadamente');
-                        stopCamera();
-                    };
-                });
-                
+                // Actualizar estado
+                statusDiv.textContent = 'Cámara activa. Pulse "Escanear" para capturar.';
             } catch (error) {
                 console.error('Error al acceder a la cámara:', error);
-                
-                // Mensajes de error más descriptivos para iOS
-                if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-                    if (error.name === 'NotAllowedError') {
-                        alert('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de Safari.');
-                    } else {
-                        alert('Error al acceder a la cámara en iOS: ' + error.message);
-                    }
-                } else {
-                    alert('No se pudo acceder a la cámara: ' + error.message);
-                }
+                statusDiv.textContent = 'No se pudo acceder a la cámara: ' + error.message;
             }
         }
         
-        // Detener cámara
+        // Detener la cámara
         function stopCamera() {
-            if (video.srcObject) {
-                const tracks = video.srcObject.getTracks();
-                tracks.forEach(track => track.stop());
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
+                stream = null;
             }
-            cameraContainer.classList.remove('visible');
         }
         
-        // Capturar imagen
-        function captureImage() {
-            // Configurar canvas
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
-            
-            canvas.width = videoWidth;
-            canvas.height = videoHeight;
-            
-            // Dibujar video completo en canvas primero
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
-            
-            // Calcular las coordenadas del rectángulo de enfoque
-            const focusRect = document.getElementById('focusRect');
-            const rectPosition = focusRect.getBoundingClientRect();
-            
-            // Calcular la posición del rectángulo en relación con el video
-            const videoPosition = video.getBoundingClientRect();
-            
-            // Calcular la escala entre el tamaño real del video y cómo se muestra
-            const scaleX = videoWidth / videoPosition.width;
-            const scaleY = videoHeight / videoPosition.height;
-            
-            // Calcular las coordenadas del área de recorte en el espacio del video
-            const cropX = (rectPosition.left - videoPosition.left) * scaleX;
-            const cropY = (rectPosition.top - videoPosition.top) * scaleY;
-            const cropWidth = rectPosition.width * scaleX;
-            const cropHeight = rectPosition.height * scaleY;
-            
-            // Crear un segundo canvas para el área recortada
-            const cropCanvas = document.createElement('canvas');
-            cropCanvas.width = cropWidth;
-            cropCanvas.height = cropHeight;
-            const cropCtx = cropCanvas.getContext('2d');
-            
-            // Dibujar solo el área del rectángulo de enfoque
-            cropCtx.drawImage(
-                canvas, 
-                cropX, cropY, cropWidth, cropHeight, 
-                0, 0, cropWidth, cropHeight
-            );
-            
-            // Convertir a URL de datos
-            const croppedImageDataUrl = cropCanvas.toDataURL('image/jpeg');
-            
-            // También guardar la imagen completa como respaldo
-            const fullImageDataUrl = canvas.toDataURL('image/jpeg');
-            
-            // Iniciar procesamiento de OCR en el área recortada primero
-            processImage(croppedImageDataUrl, fullImageDataUrl);
+        // Alternar entre escanear y detener
+        function toggleScan() {
+            if (scanning) {
+                stopScanning();
+            } else {
+                startScanning();
+            }
         }
         
-        // Procesar imagen con OCR
-        async function processImage(croppedImageDataUrl, fullImageDataUrl) {
-            loadingOverlay.classList.add('visible');
+        // Iniciar el proceso de escaneo
+        function startScanning() {
+            scanning = true;
+            scanButton.textContent = 'Detener';
+            statusDiv.textContent = 'Escaneando...';
+            
+            // Crear canvas para capturar la imagen si no existe
+            if (!canvas) {
+                canvas = document.createElement('canvas');
+            }
+            
+            // Iniciar el proceso de captura periódica
+            captureAndProcess();
+        }
+        
+        // Detener el proceso de escaneo
+        function stopScanning() {
+            scanning = false;
+            scanButton.textContent = 'Escanear';
+            statusDiv.textContent = 'Cámara activa. Pulse "Escanear" para capturar.';
+        }
+        
+        // Capturar y procesar la imagen
+        async function captureAndProcess() {
+            if (!scanning) return;
             
             try {
-                // Detener cámara mientras procesamos
-                stopCamera();
+                // Ajustar canvas al tamaño del video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
                 
-                // Crear un trabajador de Tesseract
-                const worker = await Tesseract.createWorker({
-                    logger: m => console.log(m)
+                // Obtener el contexto y dibujar el frame actual
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Calcular las coordenadas de la región de interés (el rectángulo rojo)
+                const videoRect = video.getBoundingClientRect();
+                const overlayRect = document.querySelector('.scanner-overlay').getBoundingClientRect();
+                
+                // Convertir coordenadas de la pantalla a coordenadas del video
+                const scaleX = canvas.width / videoRect.width;
+                const scaleY = canvas.height / videoRect.height;
+                
+                const cropX = (overlayRect.left - videoRect.left) * scaleX;
+                const cropY = (overlayRect.top - videoRect.top) * scaleY;
+                const cropWidth = overlayRect.width * scaleX;
+                const cropHeight = overlayRect.height * scaleY;
+                
+                // Extraer la región de interés
+                const imageData = ctx.getImageData(cropX, cropY, cropWidth, cropHeight);
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = cropWidth;
+                tempCanvas.height = cropHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(imageData, 0, 0);
+                
+                // Procesar la imagen con Tesseract OCR
+                statusDiv.textContent = 'Procesando imagen...';
+                
+                const result = await Tesseract.recognize(tempCanvas, 'eng', {
+                    tessedit_char_whitelist: '0123456789abcdef'
                 });
                 
-                // Cargar el modelo
-                await worker.loadLanguage('eng');
-                await worker.initialize('eng');
+                // Extraer el texto reconocido y limpiarlo
+                let recognizedText = result.data.text.trim().toLowerCase();
                 
-                // Primera pasada: optimizada para texto alfanumérico
-                await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789ABCDEFabcdef',
-                    tessedit_pageseg_mode: '7', // Tratar como una sola línea
-                    preserve_interword_spaces: '0'
-                });
+                // Eliminar espacios y saltos de línea
+                recognizedText = recognizedText.replace(/[\s\n\r]/g, '');
                 
-                // Procesar la imagen recortada
-                const result1 = await worker.recognize(croppedImageDataUrl);
-                console.log("Primer reconocimiento:", result1.data.text);
+                // Filtrar solo caracteres hexadecimales
+                recognizedText = recognizedText.replace(/[^0-9a-f]/g, '');
                 
-                // Segunda pasada: configuración alternativa
-                await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789ABCDEFabcdef',
-                    tessedit_pageseg_mode: '6', // Asume un bloque de texto uniforme
-                    scale: 2.0, // Escalado para mejorar reconocimiento
-                    textord_min_linesize: 2.5
-                });
-                
-                const result2 = await worker.recognize(croppedImageDataUrl);
-                console.log("Segundo reconocimiento:", result2.data.text);
-                
-                // Tercera pasada sin preprocesamiento
-                const result3 = await worker.recognize(fullImageDataUrl);
-                console.log("Tercer reconocimiento (imagen completa):", result3.data.text);
-                
-                await worker.terminate();
-                
-                // Procesar los resultados
-                const candidates = [];
-                
-                // Función para extraer UUID potencial y corregir caracteres problemáticos
-                const extractPotentialUuid = (text) => {
-                    // Corregir confusiones comunes primero
-                    let correctedText = text.replace(/g/gi, '9'); // Corregir 'g' por '9'
-                    correctedText = correctedText.replace(/o/gi, '0'); // Corregir 'o' por '0'
-                    correctedText = correctedText.replace(/l|i/gi, '1'); // Corregir 'l' o 'i' por '1'
-                    correctedText = correctedText.replace(/z/gi, '2'); // Corregir 'z' por '2'
-                    correctedText = correctedText.replace(/s/gi, '5'); // Corregir 's' por '5'
-                    correctedText = correctedText.replace(/b/gi, '6'); // Corregir 'b' por '6'
-                    correctedText = correctedText.replace(/t/gi, 'f'); // Corregir 't' por 'f' en algunos casos
+                // Si hay al menos algunos caracteres hexadecimales reconocidos
+                if (recognizedText && recognizedText.length > 0) {
+                    console.log('Texto reconocido:', recognizedText);
                     
-                    // Eliminar todos los caracteres no hexadecimales
-                    const cleanText = correctedText.replace(/[^0-9a-fA-F]/gi, '');
-                    
-                    // Solo buscar secuencias exactas de 16 caracteres hexadecimales
-                    const uuidPattern = /[0-9a-fA-F]{16}/gi;
-                    const matches = cleanText.match(uuidPattern);
-                    if (matches && matches.length > 0) {
-                        return matches[0];
-                    }
-                    
-                    // Si encontramos una secuencia más larga, tomar los primeros 16 caracteres
-                    if (cleanText.length >= 16) {
-                        return cleanText.slice(0, 16);
-                    }
-                    
-                    return null;
-                };
-                
-                // Recolectar candidatos de cada resultado
-                [result1.data.text, result2.data.text, result3.data.text].forEach(text => {
-                    const uuid = extractPotentialUuid(text);
-                    if (uuid) {
-                        candidates.push(uuid);
-                    }
-                });
-                
-                // Si no tenemos candidatos, intentemos una limpieza más agresiva
-                if (candidates.length === 0) {
-                    const allText = result1.data.text + " " + result2.data.text + " " + result3.data.text;
-                    console.log("Texto combinado para análisis: ", allText);
-                    
-                    // Corregir confusiones comunes
-                    let correctedText = allText.replace(/g/gi, '9');
-                    correctedText = correctedText.replace(/o/gi, '0');
-                    correctedText = correctedText.replace(/l|i/gi, '1');
-                    correctedText = correctedText.replace(/z/gi, '2');
-                    correctedText = correctedText.replace(/s/gi, '5');
-                    correctedText = correctedText.replace(/b/gi, '6');
-                    correctedText = correctedText.replace(/t/gi, 'f');
-                    
-                    // Extraer solo caracteres hexadecimales
-                    let hexOnly = "";
-                    for (let i = 0; i < correctedText.length; i++) {
-                        if (/[0-9a-fA-F]/i.test(correctedText[i])) {
-                            hexOnly += correctedText[i];
-                        }
-                    }
-                    
-                    console.log("Caracteres hexadecimales extraídos: ", hexOnly);
-                    
-                    if (hexOnly.length >= 16) {
-                        candidates.push(hexOnly.substring(0, 16));
+                    // Si encontramos exactamente 16 caracteres, consideramos que es un éxito
+                    if (recognizedText.length === 16) {
+                        hexInput.value = recognizedText;
+                        validateHexInput();
+                        
+                        // Detener el escaneo después de un éxito
+                        stopScanning();
+                        
+                        // Mostrar notificación de éxito
+                        showNotification('¡Cadena hexadecimal detectada con éxito!');
+                        
+                        // Generar QR automáticamente
+                        generateQR();
+                        return;
+                    } else if (recognizedText.length > 16) {
+                        // Si hay más de 16 caracteres, tomamos los primeros 16
+                        hexInput.value = recognizedText.substring(0, 16);
+                        validateHexInput();
+                    } else {
+                        // Si hay menos de 16 caracteres, actualizamos el campo de texto
+                        // pero seguimos escaneando
+                        hexInput.value = recognizedText;
+                        validateHexInput();
                     }
                 }
                 
-                // ¿Encontramos algún candidato?
-                if (candidates.length > 0) {
-                    console.log("Candidatos de UUID encontrados:", candidates);
-                    
-                    // Filtrar solo los candidatos que tengan exactamente 16 caracteres
-                    const validCandidates = candidates.filter(c => 
-                        c.length === 16 && /^[0-9a-fA-F]+$/i.test(c));
-                    
-                    // Si no hay candidatos válidos de 16 caracteres, intentar con el mejor candidato disponible
-                    if (validCandidates.length > 0) {
-                        // Tomar el primer candidato válido
-                        const bestCandidate = validCandidates[0];
-                        console.log("Mejor candidato seleccionado:", bestCandidate);
-                        
-                        showResult(bestCandidate);
-                    } else if (candidates.length > 0) {
-                        // Si no tenemos exactamente 16 caracteres, usar el primero y ajustar a 16
-                        let bestCandidate = candidates[0];
-                        if (bestCandidate.length > 16) {
-                            bestCandidate = bestCandidate.substring(0, 16);
-                        } else if (bestCandidate.length < 16) {
-                            // Rellenar con ceros si falta
-                            bestCandidate = bestCandidate.padEnd(16, '0');
-                        }
-                        
-                        console.log("Candidato ajustado a 16 caracteres:", bestCandidate);
-                        showResult(bestCandidate);
-                    } else {
-                        alert('No se pudo reconocer un UUID válido. Intente capturar una imagen más clara.');
-                    }
-                } else {
-                    alert('No se encontró ningún UUID. Intente con mejor iluminación o ángulo diferente.');
+                // Continuar escaneando si no se detuvo
+                if (scanning) {
+                    // Esperar un breve momento antes de la siguiente captura
+                    setTimeout(captureAndProcess, 500);
                 }
             } catch (error) {
-                console.error('Error en OCR:', error);
-                alert('Error al procesar la imagen: ' + error.message);
-            } finally {
-                loadingOverlay.classList.remove('visible');
+                console.error('Error al procesar la imagen:', error);
+                statusDiv.textContent = 'Error al procesar la imagen: ' + error.message;
+                
+                // Reintentar si todavía está en modo escaneo
+                if (scanning) {
+                    setTimeout(captureAndProcess, 1000);
+                }
             }
         }
         
-        // Mostrar resultado
-        function showResult(uuid) {
-            // Si el UUID tiene menos o más de 16 caracteres, ajustarlo
-            if (uuid.length !== 16) {
-                if (uuid.length > 16) {
-                    uuid = uuid.substring(0, 16);
-                } else {
-                    uuid = uuid.padEnd(16, '0');
-                }
+        // Validar la entrada hexadecimal
+        function validateHexInput() {
+            const value = hexInput.value.trim().toLowerCase();
+            const isValid = /^[0-9a-f]{16}$/.test(value);
+            
+            if (value === '') {
+                hexError.classList.add('hidden');
+                generateButton.disabled = true;
+            } else if (!isValid) {
+                hexError.classList.remove('hidden');
+                generateButton.disabled = true;
+            } else {
+                hexError.classList.add('hidden');
+                generateButton.disabled = false;
             }
-            
-            // Asegurarse de que sea hexadecimal
-            if (!/^[0-9a-fA-F]+$/.test(uuid)) {
-                alert('El UUID contiene caracteres no válidos. Intente capturar la imagen nuevamente.');
-                return;
-            }
-            
-            // Actualizar estado
-            currentUuid = uuid;
-            
-            // Mostrar UUID en la interfaz
-            uuidDisplay.textContent = uuid;
-            
-            // Generar código QR
-            generateQRCode(uuid);
-            
-            // Mostrar el contenedor de resultados
-            resultContainer.classList.add('visible');
-            
-            // Hacer scroll hacia el resultado
-            resultContainer.scrollIntoView({ behavior: 'smooth' });
         }
         
         // Generar código QR
-        function generateQRCode(text) {
-            // Limpiar contenedor
-            qrCode.innerHTML = '';
+        function generateQR() {
+            const value = hexInput.value.trim();
             
-            // Generar QR
-            QRCode.toCanvas(qrCode, text, {
+            // Vaciar el contenedor de QR
+            qrCodeDiv.innerHTML = '';
+            
+            // Crear instancia de QRCode
+            qrInstance = new QRCode(qrCodeDiv, {
+                text: value,
                 width: 200,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function (error) {
-                if (error) console.error('Error al generar QR:', error);
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
             });
-        }
-        
-        // Copiar UUID al portapapeles
-        function copyUuidToClipboard() {
-            if (!currentUuid) return;
             
-            navigator.clipboard.writeText(currentUuid)
-                .then(() => {
-                    // Feedback visual
-                    copyButton.innerHTML = '<i class="fas fa-check"></i>Copiado';
-                    setTimeout(() => {
-                        copyButton.innerHTML = '<i class="fas fa-copy"></i>Copiar';
-                    }, 2000);
-                })
-                .catch(err => {
-                    console.error('Error al copiar:', err);
-                    alert('No se pudo copiar al portapapeles');
-                });
+            statusDiv.textContent = 'Código QR generado para: ' + value;
         }
         
-        // Iniciar la app
+        // Mostrar notificación
+        function showNotification(message) {
+            notificationDiv.textContent = message;
+            notificationDiv.className = 'success-notification';
+            
+            // Ocultar después de la animación
+            setTimeout(() => {
+                notificationDiv.className = 'hidden';
+            }, 5000);
+        }
+        
+        // Iniciar la aplicación cuando se cargue el DOM
         document.addEventListener('DOMContentLoaded', init);
+        
+        // Manejar eventos de visibilidad de la página
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // La página está oculta, detener la cámara para ahorrar recursos
+                if (scanning) {
+                    stopScanning();
+                }
+            } else {
+                // La página está visible de nuevo, reiniciar la cámara si es necesario
+                if (!stream) {
+                    startCamera();
+                }
+            }
+        });
     </script>
 </body>
 </html>

@@ -227,14 +227,36 @@
             color: #1976d2;
         }
         
-        .hidden {
-            display: none;
-        }
-        
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
             }
+        }
+        
+        .edit-result-container {
+            margin: 10px 0;
+        }
+        
+        .edit-form {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .edit-actions {
+            display: flex;
+            gap: 10px;
         }
         
         .zoom-controls {
@@ -267,9 +289,7 @@
     </style>
 </head>
 <body>
-    <div class="mercadona-header">
-        <img src="https://www.mercadona.es/static/media/logo.f851f64f.svg" alt="Mercadona" class="mercadona-logo" onerror="this.onerror=null; this.src='/api/placeholder/180/60'; this.alt='Mercadona'">
-    </div>
+    <!-- Se ha eliminado el logo de Mercadona -->
     
     <div class="container">
         <div class="column main-column">
@@ -290,8 +310,8 @@
             </div>
             
             <div class="input-group">
-                <label for="referenceNumber">Número de referencia:</label>
-                <input type="number" id="referenceNumber" placeholder="Ingrese un número para esta captura">
+                <label for="referenceNumber">Máquina:</label>
+                <input type="number" id="referenceNumber" placeholder="Número" style="width: 100px; text-align: center;" min="1" max="999">
             </div>
             
             <div id="status" class="status info">
@@ -329,6 +349,7 @@
         let captures = [];
         let isProcessing = false; // Flag para evitar múltiples capturas simultáneas
         let debugMode = false; // Modo de depuración, se puede activar desde la consola
+        let currentEditingId = null; // ID de la captura que se está editando
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureBtn = document.getElementById('captureBtn');
@@ -741,16 +762,30 @@
             const number = referenceNumber.value.trim();
             const timestamp = new Date().toISOString();
             
-            // Crear objeto de captura
             const capture = {
-                id: Date.now(),
+                id: currentEditingId || Date.now(),
                 number: number,
                 hexCode: hexCode,
                 timestamp: timestamp
             };
             
-            // Añadir al historial
-            captures.unshift(capture);
+            if (currentEditingId) {
+                // Estamos editando una captura existente
+                const index = captures.findIndex(c => c.id === currentEditingId);
+                if (index !== -1) {
+                    captures[index] = capture;
+                    updateStatus(`Captura #${currentEditingId} actualizada`, 'success');
+                } else {
+                    // Si no encontramos la captura, la añadimos como nueva
+                    captures.unshift(capture);
+                }
+                // Resetear modo edición
+                currentEditingId = null;
+            } else {
+                // Nueva captura
+                captures.unshift(capture);
+            }
+            
             saveCapturesToStorage();
             updateCaptureHistory();
             
@@ -759,7 +794,7 @@
             clearHistoryBtn.disabled = false;
             
             // Mostrar resultado y generar QR
-            showResult(hexCode, number);
+            showResult(hexCode, number, capture.id);
             generateQRCode(hexCode);
             
             updateStatus(`Código hexadecimal capturado con éxito: ${hexCode}`, 'success');
@@ -807,12 +842,107 @@
         }
         
         // Mostrar resultado de captura
-        function showResult(hexCode, number) {
+        function showResult(hexCode, number, id = null) {
             resultText.innerHTML = `
-                <p><strong>Código Hexadecimal:</strong> <span style="font-family: monospace;">${hexCode}</span></p>
-                ${number ? `<p><strong>Número de Referencia:</strong> ${number}</p>` : ''}
+                <p><strong>Código Hexadecimal:</strong> <span style="font-family: monospace;" id="resultHexCode">${hexCode}</span></p>
+                ${number ? `<p><strong>Máquina:</strong> <span id="resultNumber">${number}</span></p>` : ''}
             `;
+            
+            // Si hay un ID, guárdalo como atributo para facilitar la edición
+            if (id) {
+                resultText.setAttribute('data-capture-id', id);
+            }
+            
             resultContainer.classList.remove('hidden');
+            
+            // Añadir event listener al botón de edición
+            const editBtn = document.getElementById('editCaptureBtn');
+            if (editBtn) {
+                editBtn.onclick = startEditCapture;
+            }
+        }
+        
+        // Iniciar edición de captura
+        function startEditCapture() {
+            const captureId = resultText.getAttribute('data-capture-id');
+            if (!captureId) return;
+            
+            const id = parseInt(captureId);
+            const capture = captures.find(c => c.id === id);
+            if (!capture) return;
+            
+            // Preparar el formulario de edición
+            currentEditingId = id;
+            
+            // Crear contenido de edición
+            resultText.innerHTML = `
+                <div class="edit-form">
+                    <div class="form-group">
+                        <label for="editHexCode">Código Hexadecimal:</label>
+                        <input type="text" id="editHexCode" value="${capture.hexCode}" 
+                               style="font-family: monospace; width: 100%;" 
+                               pattern="[0-9a-fA-F]{16}" maxlength="16" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editNumber">Máquina:</label>
+                        <input type="number" id="editNumber" value="${capture.number || ''}" 
+                               style="width: 100px; text-align: center;" min="1" max="999">
+                    </div>
+                    <div class="edit-actions" style="margin-top: 15px;">
+                        <button id="saveEditBtn" class="action-btn">Guardar</button>
+                        <button id="cancelEditBtn" class="action-btn danger">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            
+            // Ocultar el botón de edición mientras estamos editando
+            const editBtn = document.getElementById('editCaptureBtn');
+            if (editBtn) editBtn.style.display = 'none';
+            
+            // Añadir event listeners a los botones
+            document.getElementById('saveEditBtn').addEventListener('click', saveEditCapture);
+            document.getElementById('cancelEditBtn').addEventListener('click', cancelEditCapture);
+            
+            updateStatus('Editando captura...', 'info');
+        }
+        
+        // Guardar edición de captura
+        function saveEditCapture() {
+            const hexCodeInput = document.getElementById('editHexCode');
+            const numberInput = document.getElementById('editNumber');
+            
+            // Validar entrada
+            const hexCode = hexCodeInput.value.trim().toLowerCase();
+            if (!hexRegex.test(hexCode)) {
+                updateStatus('El código hexadecimal debe tener 16 caracteres (0-9, a-f)', 'error');
+                return;
+            }
+            
+            // Actualizar captura
+            handleValidHexCode(hexCode);
+            
+            // Resetear el formulario de edición
+            const editBtn = document.getElementById('editCaptureBtn');
+            if (editBtn) editBtn.style.display = 'block';
+        }
+        
+        // Cancelar edición de captura
+        function cancelEditCapture() {
+            const capture = captures.find(c => c.id === currentEditingId);
+            if (capture) {
+                showResult(capture.hexCode, capture.number, capture.id);
+            } else {
+                resultContainer.classList.add('hidden');
+            }
+            
+            // Resetear modo edición
+            currentEditingId = null;
+            
+            // Mostrar el botón de edición
+            const editBtn = document.getElementById('editCaptureBtn');
+            if (editBtn) editBtn.style.display = 'block';
+            
+            updateStatus('Edición cancelada', 'info');
         }
         
         // Actualizar historial de capturas
@@ -827,7 +957,7 @@
             // Encabezado para explicar el formato
             const headerElement = document.createElement('div');
             headerElement.className = 'history-header';
-            headerElement.innerHTML = '<span>Formato: [número]  [cadena hex]</span>';
+            headerElement.innerHTML = '<span>Formato: [máquina]  [cadena hex]</span>';
             headerElement.style.padding = '5px 10px';
             headerElement.style.marginBottom = '10px';
             headerElement.style.borderBottom = '1px solid #ddd';
@@ -853,6 +983,10 @@
                             🔄
                             <span class="tooltiptext">Generar QR</span>
                         </button>
+                        <button class="tooltip action-btn" onclick="editHistoryItem(${capture.id})">
+                            ✏️
+                            <span class="tooltiptext">Editar</span>
+                        </button>
                         <button class="tooltip action-btn danger" onclick="removeHistoryItem(${capture.id})">
                             🗑️
                             <span class="tooltiptext">Eliminar</span>
@@ -864,19 +998,24 @@
             });
         }
         
-        // Eliminar un elemento específico del historial
-        function removeHistoryItem(id) {
-            if (confirm('¿Está seguro que desea eliminar esta entrada del historial?')) {
-                captures = captures.filter(capture => capture.id !== id);
-                saveCapturesToStorage();
-                updateCaptureHistory();
-                
-                // Actualizar estado de los botones
-                downloadBtn.disabled = captures.length === 0;
-                clearHistoryBtn.disabled = captures.length === 0;
-                
-                updateStatus('Entrada eliminada del historial', 'info');
-            }
+        // Editar un elemento específico del historial
+        function editHistoryItem(id) {
+            const capture = captures.find(c => c.id === id);
+            if (!capture) return;
+            
+            // Establecer el ID de edición actual
+            currentEditingId = id;
+            
+            // Establecer valores para edición
+            referenceNumber.value = capture.number || '';
+            
+            // Mostrar el resultado para edición
+            showResult(capture.hexCode, capture.number, id);
+            generateQRCode(capture.hexCode);
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
+            
+            // Iniciar edición inmediatamente
+            startEditCapture();
         }
         
         // Copiar texto al portapapeles
@@ -890,10 +1029,20 @@
         }
         
         // Generar QR para un elemento del historial
-        function generateQRCodeForItem(hexCode) {
-            generateQRCode(hexCode);
-            showResult(hexCode, '');
-            resultContainer.scrollIntoView({ behavior: 'smooth' });
+        function generateQRCodeForItem(hexCode, captureId) {
+            const capture = captureId ? 
+                captures.find(c => c.id === captureId) : 
+                captures.find(c => c.hexCode === hexCode);
+            
+            if (capture) {
+                showResult(capture.hexCode, capture.number, capture.id);
+                generateQRCode(capture.hexCode);
+                resultContainer.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                showResult(hexCode, '', null);
+                generateQRCode(hexCode);
+                resultContainer.scrollIntoView({ behavior: 'smooth' });
+            }
         }
         
         // Descargar capturas como archivo de texto

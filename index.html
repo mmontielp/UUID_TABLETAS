@@ -166,6 +166,20 @@
             }
         }
     </style>
+
+    <script>
+        // Prevenir el comportamiento de caché de iOS
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+
+        // Manejar problemas de scroll en iOS
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.5/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>

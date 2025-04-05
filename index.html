@@ -233,6 +233,17 @@
                 
                 // Intentar iniciar la cámara automáticamente
                 await startCamera();
+                
+                // Pre-inicializar Tesseract para que esté listo
+                setTimeout(() => {
+                    Tesseract.recognize(
+                        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==',
+                        'eng',
+                        { logger: m => console.log(m) }
+                    ).finally(() => {
+                        console.log('Tesseract inicializado');
+                    });
+                }, 500);
             } catch (error) {
                 console.error('Error al inicializar:', error);
                 statusDiv.textContent = 'Error al inicializar la cámara: ' + error.message;
@@ -329,6 +340,7 @@
         // Iniciar el proceso de escaneo
         function startScanning() {
             scanning = true;
+            isProcessing = false; // Reiniciar la bandera de procesamiento
             scanButton.textContent = 'Detener';
             statusDiv.textContent = 'Capturando...';
             
@@ -342,6 +354,14 @@
                 canvas = document.createElement('canvas');
             }
             
+            // Reiniciar el worker de Tesseract
+            Tesseract.terminate();
+            
+            // Iniciar el proceso de captura
+            // Usar requestAnimationFrame para mayor fluidez
+            requestAnimationFrame(captureAndProcess);
+        }
+            
             // Iniciar el proceso de captura periódica
             captureAndProcess();
         }
@@ -349,6 +369,7 @@
         // Detener el proceso de escaneo
         function stopScanning() {
             scanning = false;
+            isProcessing = false;
             scanButton.textContent = 'Capturar';
             statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
             
@@ -356,19 +377,48 @@
             if (zoomedDisplayCanvas) {
                 zoomedDisplayCanvas.style.display = 'none';
             }
+            
+            // Cancelar cualquier reconocimiento en curso
+            Tesseract.terminate();
         }
         
         // Variable para controlar si se está procesando una imagen
         let isProcessing = false;
+        let tesseractWorker = null;
+        
+        // Inicializar el worker de Tesseract una sola vez
+        function initTesseract() {
+            if (!tesseractWorker) {
+                tesseractWorker = Tesseract.createWorker({
+                    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/worker.min.js',
+                    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+                    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@2.2.0/tesseract-core.wasm.js',
+                    logger: message => console.log(message)
+                });
+            }
+            return tesseractWorker;
+        }
         
         // Capturar y procesar la imagen
         async function captureAndProcess() {
-            if (!scanning || isProcessing) return;
+            if (!scanning) return;
+            
+            // Si ya estamos procesando, no iniciar otro proceso
+            if (isProcessing) {
+                requestAnimationFrame(captureAndProcess);
+                return;
+            }
             
             // Marcar que estamos procesando
             isProcessing = true;
             
             try {
+                // Evitar procesar imágenes si la cámara no está lista o si no estamos escaneando
+                if (!video.videoWidth || !scanning) {
+                    isProcessing = false;
+                    return;
+                }
+                
                 // Ajustar canvas al tamaño del video
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -408,22 +458,32 @@
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.putImageData(imageData, 0, 0);
                 
-                // Procesar la imagen con Tesseract OCR
+                // Procesar la imagen con un límite de tiempo para evitar bloqueos
                 statusDiv.textContent = 'Procesando imagen...';
                 
-                // Configuración adicional para mejorar el reconocimiento de caracteres problemáticos
-                const result = await Tesseract.recognize(tempCanvas, 'eng', {
-                    tessedit_char_whitelist: '0123456789abcdef',
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    // Mejorar el reconocimiento de caracteres problemáticos
-                    tessedit_char_blacklist: 'gGiIlLoO',  // Evitar confusiones comunes
-                    tessedit_enable_dict_correction: '0', // Evitar correcciones de diccionario
-                    tessedit_pageseg_mode: '7',           // Tratarlo como una línea de texto
-                    tessedit_ocr_engine_mode: '2',        // Usar LSTM para mejor precisión
-                    tessjs_image_pre_multiplier: '2',     // Aumentar resolución para mejor reconocimiento
-                    tessjs_create_box: '1'                // Crear datos de caja para mejor análisis
-                });
+                try {
+                    // Límite de tiempo para el reconocimiento (evitar reconocimientos eternos)
+                    const recognitionTimeout = 3000; // 3 segundos máximo por reconocimiento
+                    
+                    // Crear una promesa que se resuelve con el resultado o se rechaza después del tiempo límite
+                    const recognitionWithTimeout = Promise.race([
+                        Tesseract.recognize(tempCanvas, 'eng', {
+                            tessedit_char_whitelist: '0123456789abcdef',
+                            tessjs_create_hocr: '0',
+                            tessjs_create_tsv: '0',
+                            tessedit_char_blacklist: 'gGiIlLoO',
+                            tessedit_enable_dict_correction: '0',
+                            tessedit_pageseg_mode: '7',
+                            tessedit_ocr_engine_mode: '2',
+                            tessjs_image_pre_multiplier: '2',
+                            tessjs_create_box: '1'
+                        }),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error("Tiempo de reconocimiento excedido")), recognitionTimeout)
+                        )
+                    ]);
+                    
+                    const result = await recognitionWithTimeout;
                 
                 // Extraer el texto reconocido y limpiarlo
                 let recognizedText = result.data.text.trim().toLowerCase();
@@ -507,14 +567,24 @@
                 }
             } catch (error) {
                 console.error('Error al procesar la imagen:', error);
-                statusDiv.textContent = 'Error al procesar la imagen: ' + error.message;
+                
+                if (error.message === "Tiempo de reconocimiento excedido") {
+                    statusDiv.textContent = 'El reconocimiento está tomando demasiado tiempo. Reintentando...';
+                    // Forzar la terminación del worker de Tesseract para evitar que se quede colgado
+                    Tesseract.terminate();
+                } else {
+                    statusDiv.textContent = 'Error: ' + error.message;
+                }
                 
                 // Marcar que hemos terminado de procesar incluso con error
                 isProcessing = false;
                 
-                // Reintentar si todavía está en modo escaneo
+                // Reintentar solo si seguimos en modo escaneo
                 if (scanning) {
-                    requestAnimationFrame(captureAndProcess);
+                    // Pequeña pausa antes de reintentar
+                    setTimeout(() => {
+                        requestAnimationFrame(captureAndProcess);
+                    }, 100);
                 }
             }
         }

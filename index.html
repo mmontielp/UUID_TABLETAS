@@ -60,6 +60,13 @@
             margin-bottom: 1rem;
         }
         
+        .scan-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 1.5rem 0;
+        }
+        
         .scan-button {
             background-color: #2196F3;
             color: white;
@@ -73,13 +80,15 @@
             justify-content: center;
             width: 100%;
             cursor: pointer;
-            margin: 1.5rem 0;
             transition: background-color 0.2s, transform 0.1s;
+        }
+        
+        .gallery-button {
+            background-color: #673AB7;
         }
         
         .scan-button:active {
             transform: scale(0.98);
-            background-color: #1976D2;
         }
         
         .scan-button i {
@@ -349,13 +358,21 @@
         <h1>UUID Scanner a QR</h1>
     </header>
     
+    <!-- Agregar un botón para seleccionar imágenes de la galería como alternativa -->
     <main>
         <div class="card">
-            <p class="info-text">Escanea un UUID de 16 caracteres desde la pantalla y genera su código QR</p>
+            <p class="info-text">Escanea un UUID de 16-24 caracteres desde la pantalla y genera su código QR</p>
             
-            <button id="scanButton" class="scan-button">
-                <i class="fas fa-camera"></i> Escanear UUID
-            </button>
+            <div class="scan-options">
+                <button id="scanButton" class="scan-button">
+                    <i class="fas fa-camera"></i> Escanear con cámara
+                </button>
+                
+                <button id="galleryButton" class="scan-button gallery-button">
+                    <i class="fas fa-images"></i> Seleccionar imagen
+                </button>
+                <input type="file" id="fileSelector" accept="image/*" class="hidden">
+            </div>
             
             <div id="resultContainer" class="result-container">
                 <h2>UUID escaneado:</h2>
@@ -454,6 +471,111 @@
             cancelButton.addEventListener('click', stopCamera);
             copyButton.addEventListener('click', copyUuidToClipboard);
             shareButton.addEventListener('click', shareUuid);
+            
+            // Nuevo manejador para el botón de galería
+            const galleryButton = document.getElementById('galleryButton');
+            const fileSelector = document.getElementById('fileSelector');
+            
+            galleryButton.addEventListener('click', () => {
+                fileSelector.click();
+            });
+            
+            fileSelector.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    processImageFromFile(file);
+                }
+            });
+            
+            // Agregar manejadores para elementos del historial
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('.history-item')) {
+                    const historyItem = e.target.closest('.history-item');
+                    const uuid = historyItem.querySelector('.history-uuid').textContent;
+                    showResult(uuid);
+                }
+            });
+        }
+        
+        // Procesar imagen desde archivo (galería)
+        function processImageFromFile(file) {
+            loadingOverlay.classList.add('visible');
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const imageDataUrl = e.target.result;
+                
+                try {
+                    // Pre-procesar la imagen para mejorar el OCR
+                    const enhancedImageUrl = await enhanceImageForOCR(imageDataUrl);
+                    
+                    // Configurar Tesseract
+                    const worker = await Tesseract.createWorker({
+                        logger: m => console.log(m)
+                    });
+                    
+                    await worker.loadLanguage('eng');
+                    await worker.initialize('eng');
+                    
+                    // Configuración optimizada para UUIDs
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789abcdefABCDEF',
+                        tessedit_pageseg_mode: '7',
+                        tessedit_ocr_engine_mode: '2',
+                        preserve_interword_spaces: '0',
+                    });
+                    
+                    // Procesar la imagen
+                    const { data } = await worker.recognize(enhancedImageUrl);
+                    await worker.terminate();
+                    
+                    // Buscar UUIDs
+                    const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
+                    const matches = data.text.match(uuidPattern);
+                    
+                    // Limpiar texto (eliminar espacios y caracteres no deseados)
+                    const cleanText = data.text.replace(/[^0-9a-fA-F]/g, '');
+                    
+                    // Verificar si el texto limpio tiene entre 16 y 24 caracteres
+                    if (cleanText.length >= 16 && cleanText.length <= 24) {
+                        const uuid = cleanText.slice(0, Math.min(cleanText.length, 24));
+                        showResult(uuid);
+                        
+                        // Guardar en historial
+                        scanHistory.unshift({
+                            uuid: uuid,
+                            timestamp: new Date().toISOString()
+                        });
+                        saveHistory();
+                        renderHistory();
+                    } else if (matches && matches.length > 0) {
+                        showResult(matches[0]);
+                        
+                        // Guardar en historial
+                        scanHistory.unshift({
+                            uuid: matches[0],
+                            timestamp: new Date().toISOString()
+                        });
+                        saveHistory();
+                        renderHistory();
+                    } else {
+                        alert('No se encontró ningún UUID válido en la imagen');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error en OCR:', error);
+                    alert('Error al procesar la imagen: ' + error.message);
+                } finally {
+                    loadingOverlay.classList.remove('visible');
+                }
+            };
+            
+            reader.onerror = () => {
+                loadingOverlay.classList.remove('visible');
+                alert('Error al leer el archivo');
+            };
+            
+            reader.readAsDataURL(file);
         }
         
         // Cargar historial
@@ -512,26 +634,68 @@
                     return;
                 }
                 
-                // Configurar cámara
+                // Configurar cámara optimizada para iOS
                 const constraints = {
                     video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        facingMode: 'environment', // Usar cámara trasera
+                        width: { ideal: 1920 },    // Alta resolución para mejor OCR
+                        height: { ideal: 1080 },
+                        // Estos ajustes pueden mejorar la captura en iOS
+                        zoom: 1.0,                 // Sin zoom inicial
+                        focusMode: 'continuous',   // Enfoque automático continuo
+                        exposureMode: 'continuous', // Exposición automática continua
+                        whiteBalanceMode: 'continuous'
                     }
                 };
                 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                cameraContainer.classList.add('visible');
                 
-                // No necesitamos ajustar el tamaño ahora ya que usamos píxeles fijos
-                // para el rectángulo de enfoque, que ya está dimensionado para
-                // contener 24 caracteres con fuente TrueType 14
+                // Esperar a que el video esté listo
+                video.onloadeddata = () => {
+                    // En iOS, aplicar algunos ajustes adicionales para prevenir problemas comunes
+                    video.setAttribute('playsinline', true);  // Fundamental para iOS
+                    video.setAttribute('autoplay', true);
+                    video.muted = true;
+                    
+                    // Mostrar la interfaz de la cámara
+                    cameraContainer.classList.add('visible');
+                    
+                    // Añadir instrucciones específicas para iOS para mejor experiencia
+                    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                        const focusGuide = document.querySelector('.focus-guide');
+                        focusGuide.innerHTML = 'Centra el UUID en el rectángulo y mantén el iPhone estable. <br>Asegúrate de tener buena iluminación.';
+                    }
+                };
+                
+                // Manejar eventos de errores de reproducción (comunes en iOS)
+                video.onerror = (error) => {
+                    console.error('Error de reproducción de video:', error);
+                    alert('Error al iniciar la cámara. Intenta reiniciar la aplicación.');
+                    stopCamera();
+                };
+                
+                // Manejar errores de track (también comunes en iOS)
+                stream.getVideoTracks().forEach(track => {
+                    track.onended = () => {
+                        console.log('La cámara se detuvo inesperadamente');
+                        stopCamera();
+                    };
+                });
                 
             } catch (error) {
                 console.error('Error al acceder a la cámara:', error);
-                alert('No se pudo acceder a la cámara: ' + error.message);
+                
+                // Mensajes de error más descriptivos para iOS
+                if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                    if (error.name === 'NotAllowedError') {
+                        alert('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de Safari.');
+                    } else {
+                        alert('Error al acceder a la cámara en iOS: ' + error.message);
+                    }
+                } else {
+                    alert('No se pudo acceder a la cámara: ' + error.message);
+                }
             }
         }
         
@@ -606,28 +770,52 @@
                 // Detener cámara mientras procesamos
                 stopCamera();
                 
+                // Pre-procesar la imagen para mejorar el OCR
+                const enhancedImageUrl = await enhanceImageForOCR(croppedImageDataUrl);
+                
                 // Configurar Tesseract con idioma inglés
                 const worker = await Tesseract.createWorker({
                     logger: m => console.log(m)
                 });
                 
+                // Cargar solo el modelo esencial para mejorar la velocidad
                 await worker.loadLanguage('eng');
                 await worker.initialize('eng');
                 
-                // Mejorar reconocimiento para caracteres alfanuméricos
+                // Configuración optimizada para UUIDs
                 await worker.setParameters({
                     tessedit_char_whitelist: '0123456789abcdefABCDEF',
+                    tessedit_pageseg_mode: '7', // Tratar como una sola línea de texto
+                    tessedit_ocr_engine_mode: '2', // Usar solo LSTM para más velocidad
+                    preserve_interword_spaces: '0',
                 });
                 
-                // Primero procesar el área recortada (más rápido y preciso)
-                const { data: croppedData } = await worker.recognize(croppedImageDataUrl);
+                // Primero procesar el área recortada mejorada (más rápido y preciso)
+                const { data: croppedData } = await worker.recognize(enhancedImageUrl);
                 
-                // Buscar un patrón de 16 caracteres alfanuméricos (pero también permitir hasta 24)
+                // Buscar un patrón de 16-24 caracteres alfanuméricos
                 const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
-                const croppedText = croppedData.text.replace(/\s+/g, ''); // Eliminar espacios
-                const croppedMatches = croppedText.match(uuidPattern);
+                // Limpiar texto (eliminar espacios y caracteres no deseados)
+                const croppedText = croppedData.text.replace(/[^0-9a-fA-F]/g, '');
                 
-                // Si encontramos coincidencias en el área recortada, usamos esa
+                // Verificar si el texto limpio tiene entre 16 y 24 caracteres
+                if (croppedText.length >= 16 && croppedText.length <= 24) {
+                    const uuid = croppedText.slice(0, Math.min(croppedText.length, 24));
+                    await worker.terminate();
+                    showResult(uuid);
+                    
+                    // Guardar en historial
+                    scanHistory.unshift({
+                        uuid: uuid,
+                        timestamp: new Date().toISOString()
+                    });
+                    saveHistory();
+                    renderHistory();
+                    return;
+                }
+                
+                // Buscar patrones específicos en el texto reconocido
+                const croppedMatches = croppedData.text.match(uuidPattern);
                 if (croppedMatches && croppedMatches.length > 0) {
                     await worker.terminate();
                     showResult(croppedMatches[0]);
@@ -639,31 +827,48 @@
                     });
                     saveHistory();
                     renderHistory();
-                } 
-                // Como respaldo, intentar con la imagen completa si no hay coincidencias en el área recortada
-                else {
-                    // Reintentar con la imagen completa
-                    console.log("No se encontró UUID en el área enfocada, intentando con la imagen completa...");
+                    return;
+                }
+                
+                // Como respaldo, intentar con la imagen completa
+                console.log("No se encontró UUID en el área enfocada, intentando con la imagen completa...");
+                
+                // Pre-procesar la imagen completa
+                const enhancedFullImageUrl = await enhanceImageForOCR(fullImageDataUrl);
+                
+                const { data: fullData } = await worker.recognize(enhancedFullImageUrl);
+                await worker.terminate();
+                
+                // Aplicar la misma lógica de limpieza a la imagen completa
+                const fullText = fullData.text.replace(/[^0-9a-fA-F]/g, '');
+                
+                if (fullText.length >= 16 && fullText.length <= 24) {
+                    const uuid = fullText.slice(0, Math.min(fullText.length, 24));
+                    showResult(uuid);
                     
-                    const { data: fullData } = await worker.recognize(fullImageDataUrl);
-                    await worker.terminate();
+                    // Guardar en historial
+                    scanHistory.unshift({
+                        uuid: uuid,
+                        timestamp: new Date().toISOString()
+                    });
+                    saveHistory();
+                    renderHistory();
+                    return;
+                }
+                
+                const fullMatches = fullData.text.match(uuidPattern);
+                if (fullMatches && fullMatches.length > 0) {
+                    showResult(fullMatches[0]);
                     
-                    const fullText = fullData.text.replace(/\s+/g, '');
-                    const fullMatches = fullText.match(uuidPattern);
-                    
-                    if (fullMatches && fullMatches.length > 0) {
-                        showResult(fullMatches[0]);
-                        
-                        // Guardar en historial
-                        scanHistory.unshift({
-                            uuid: fullMatches[0],
-                            timestamp: new Date().toISOString()
-                        });
-                        saveHistory();
-                        renderHistory();
-                    } else {
-                        alert('No se encontró ningún UUID válido en la imagen');
-                    }
+                    // Guardar en historial
+                    scanHistory.unshift({
+                        uuid: fullMatches[0],
+                        timestamp: new Date().toISOString()
+                    });
+                    saveHistory();
+                    renderHistory();
+                } else {
+                    alert('No se encontró ningún UUID válido en la imagen');
                 }
                 
             } catch (error) {
@@ -672,6 +877,53 @@
             } finally {
                 loadingOverlay.classList.remove('visible');
             }
+        }
+        
+        // Función para mejorar la imagen para OCR
+        async function enhanceImageForOCR(imageDataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Dibujar la imagen original
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    
+                    // Obtener datos de imagen
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    // Aumentar el contraste y convertir a escala de grises para mejorar el OCR
+                    for (let i = 0; i < data.length; i += 4) {
+                        // Convertir a escala de grises con mayor peso al canal verde
+                        // ya que el ojo humano es más sensible a este canal
+                        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                        
+                        // Aumentar contraste
+                        const contrastFactor = 1.5; // Factor de contraste
+                        const contrast = (gray - 128) * contrastFactor + 128;
+                        
+                        // Umbrales adaptativos para texto oscuro sobre fondo claro
+                        const threshold = 140;
+                        const value = contrast > threshold ? 255 : 0;
+                        
+                        // Aplicar a todos los canales
+                        data[i] = data[i + 1] = data[i + 2] = value;
+                    }
+                    
+                    // Aplicar los cambios
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    // Devolver la imagen mejorada
+                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                };
+                
+                img.src = imageDataUrl;
+            });
         }
         
         // Mostrar resultado

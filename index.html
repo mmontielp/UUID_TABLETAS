@@ -50,7 +50,7 @@
             position: relative;
             width: 100%;
             max-width: 500px;
-            height: 220px;
+            height: 180px;
             margin-bottom: 1rem;
             overflow: hidden;
             background-color: #000;
@@ -263,12 +263,57 @@
             }
         }
         
+        // Crear elementos para zoom
+        const zoomedDisplayCanvas = document.createElement('canvas');
+        zoomedDisplayCanvas.className = 'zoomed-display';
+        let zoomContext = null;
+        
+        // Ajustar zoom de la región de interés (rectángulo rojo)
+        function createZoomedView(videoElem, captureRect, scale = 1.5) {
+            if (!zoomContext) {
+                // Configurar el canvas de visualización ampliada solo la primera vez
+                document.querySelector('.camera-container').appendChild(zoomedDisplayCanvas);
+                zoomContext = zoomedDisplayCanvas.getContext('2d');
+                
+                // Establecer estilo del canvas
+                zoomedDisplayCanvas.style.position = 'absolute';
+                zoomedDisplayCanvas.style.bottom = '5px';
+                zoomedDisplayCanvas.style.right = '5px';
+                zoomedDisplayCanvas.style.width = '100px';
+                zoomedDisplayCanvas.style.height = '40px';
+                zoomedDisplayCanvas.style.border = '1px solid #fff';
+                zoomedDisplayCanvas.style.backgroundColor = '#000';
+                zoomedDisplayCanvas.width = 200;
+                zoomedDisplayCanvas.height = 80;
+            }
+            
+            // Tamaño de la región a capturar (rectángulo rojo)
+            const sourceWidth = captureRect.width;
+            const sourceHeight = captureRect.height;
+            
+            // Centro de la región
+            const sourceX = captureRect.x;
+            const sourceY = captureRect.y;
+            
+            // Dibujar la región ampliada
+            zoomContext.drawImage(
+                videoElem,
+                sourceX, sourceY, sourceWidth, sourceHeight,  // Región fuente
+                0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height  // Destino completo
+            );
+        }
+        
         // Detener la cámara
         function stopCamera() {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
                 stream = null;
+            }
+            
+            // Ocultar vista ampliada si existe
+            if (zoomedDisplayCanvas) {
+                zoomedDisplayCanvas.style.display = 'none';
             }
         }
         
@@ -287,6 +332,11 @@
             scanButton.textContent = 'Detener';
             statusDiv.textContent = 'Capturando...';
             
+            // Mostrar vista ampliada
+            if (zoomedDisplayCanvas) {
+                zoomedDisplayCanvas.style.display = 'block';
+            }
+            
             // Crear canvas para capturar la imagen si no existe
             if (!canvas) {
                 canvas = document.createElement('canvas');
@@ -301,6 +351,11 @@
             scanning = false;
             scanButton.textContent = 'Capturar';
             statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
+            
+            // Ocultar vista ampliada
+            if (zoomedDisplayCanvas) {
+                zoomedDisplayCanvas.style.display = 'none';
+            }
         }
         
         // Variable para controlar si se está procesando una imagen
@@ -334,6 +389,16 @@
                 const cropY = (overlayRect.top - videoRect.top) * scaleY;
                 const cropWidth = overlayRect.width * scaleX;
                 const cropHeight = overlayRect.height * scaleY;
+                
+                // Crear vista ampliada para visualización al usuario
+                if (scanning) {
+                    createZoomedView(video, {
+                        x: cropX,
+                        y: cropY,
+                        width: cropWidth,
+                        height: cropHeight
+                    });
+                }
                 
                 // Extraer la región de interés
                 const imageData = ctx.getImageData(cropX, cropY, cropWidth, cropHeight);

@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -60,13 +59,6 @@
             margin-bottom: 1rem;
         }
         
-        .scan-options {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin: 1.5rem 0;
-        }
-        
         .scan-button {
             background-color: #2196F3;
             color: white;
@@ -81,10 +73,7 @@
             width: 100%;
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s;
-        }
-        
-        .gallery-button {
-            background-color: #673AB7;
+            margin: 1.5rem 0;
         }
         
         .scan-button:active {
@@ -136,7 +125,6 @@
             max-width: 100%;
         }
         
-        /* Estilos para el botón de copia más pequeño */
         .action-buttons {
             display: flex;
             justify-content: center;
@@ -163,13 +151,6 @@
         .action-button.copy {
             background-color: #e8f5e9;
             color: #2e7d32;
-        }
-        
-        .info-text {
-            text-align: center;
-            color: #666;
-            font-size: 0.9rem;
-            margin: 1rem 0;
         }
         
         .camera-container {
@@ -203,7 +184,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 190px; /* Aproximadamente 5cm en la mayoría de dispositivos */
-            height: 95px; /* Aproximadamente 2.5cm en la mayoría de dispositivos - aumentado */
+            height: 114px; /* Aproximadamente 3cm en la mayoría de dispositivos */
             border: 2px solid #2196F3;
             border-radius: 3px;
             box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
@@ -307,44 +288,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        .history-card {
-            margin-top: 2rem;
-        }
-        
-        .history-list {
-            list-style: none;
-            margin-top: 1rem;
-        }
-        
-        .history-item {
-            padding: 0.8rem;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .history-item:last-child {
-            border-bottom: none;
-        }
-        
-        .history-uuid {
-            font-family: monospace;
-            flex: 1;
-        }
-        
-        .history-time {
-            color: #999;
-            font-size: 0.8rem;
-            margin-right: 0.5rem;
-        }
-        
-        .empty-history {
-            text-align: center;
-            color: #999;
-            padding: 1rem;
-        }
     </style>
 </head>
 <body>
@@ -352,19 +295,11 @@
         <h1>UUID Scanner a QR</h1>
     </header>
     
-    <!-- Quitar el texto informativo y reorganizar botones -->
     <main>
         <div class="card">
-            <div class="scan-options">
-                <button id="scanButton" class="scan-button">
-                    <i class="fas fa-camera"></i> Escanear con cámara
-                </button>
-                
-                <button id="galleryButton" class="scan-button gallery-button">
-                    <i class="fas fa-images"></i> Seleccionar imagen
-                </button>
-                <input type="file" id="fileSelector" accept="image/*" class="hidden">
-            </div>
+            <button id="scanButton" class="scan-button">
+                <i class="fas fa-camera"></i> Escanear UUID
+            </button>
             
             <div id="resultContainer" class="result-container">
                 <h2>UUID escaneado:</h2>
@@ -382,13 +317,6 @@
                 </div>
             </div>
         </div>
-        
-        <div class="card history-card">
-            <h2>Historial reciente</h2>
-            <ul id="historyList" class="history-list">
-                <li class="empty-history">No hay registros recientes</li>
-            </ul>
-        </div>
     </main>
     
     <div id="cameraContainer" class="camera-container">
@@ -396,7 +324,7 @@
         <canvas id="canvas"></canvas>
         
         <div class="focus-rect" id="focusRect"></div>
-        <div class="focus-guide">Centra el UUID (hasta 24 caracteres) en el rectángulo azul</div>
+        <div class="focus-guide">Centra el UUID (16 caracteres) en el rectángulo azul</div>
         
         <div class="camera-actions">
             <button id="cancelButton" class="camera-button camera-cancel">
@@ -433,22 +361,18 @@
         const uuidDisplay = document.getElementById('uuidDisplay');
         const qrCode = document.getElementById('qrCode');
         const copyButton = document.getElementById('copyButton');
-        const shareButton = document.getElementById('shareButton');
         const cameraContainer = document.getElementById('cameraContainer');
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureButton = document.getElementById('captureButton');
         const cancelButton = document.getElementById('cancelButton');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const historyList = document.getElementById('historyList');
         
-        // Variables de estado
+        // Variable de estado
         let currentUuid = '';
-        let scanHistory = [];
         
         // Inicializar la aplicación
         function init() {
-            loadHistory();
             setupEventListeners();
         }
         
@@ -458,196 +382,6 @@
             captureButton.addEventListener('click', captureImage);
             cancelButton.addEventListener('click', stopCamera);
             copyButton.addEventListener('click', copyUuidToClipboard);
-            
-            // Eliminar el evento de compartir ya que quitamos el botón
-            
-            // Nuevo manejador para el botón de galería
-            const galleryButton = document.getElementById('galleryButton');
-            const fileSelector = document.getElementById('fileSelector');
-            
-            galleryButton.addEventListener('click', () => {
-                fileSelector.click();
-            });
-            
-            fileSelector.addEventListener('change', (e) => {
-                if (e.target.files && e.target.files[0]) {
-                    const file = e.target.files[0];
-                    processImageFromFile(file);
-                }
-            });
-            
-            // Ya no necesitamos el delegado de eventos ya que asignamos el evento 
-            // directamente a cada elemento del historial en renderHistory()
-        }
-        
-        // Función para procesar imágenes seleccionadas manualmente desde la galería
-        function processImageFromFile(file) {
-            loadingOverlay.classList.add('visible');
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const imageDataUrl = e.target.result;
-                
-                try {
-                    // Crear un trabajador de Tesseract
-                    const worker = await Tesseract.createWorker({
-                        logger: m => console.log(m)
-                    });
-                    
-                    // Cargar el modelo
-                    await worker.loadLanguage('eng');
-                    await worker.initialize('eng');
-                    
-                    // Primera pasada: configuración estándar
-                    await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789ABCDEFabcdef',
-                        tessedit_pageseg_mode: '7',
-                        preserve_interword_spaces: '0'
-                    });
-                    
-                    const result1 = await worker.recognize(imageDataUrl);
-                    console.log("Reconocimiento (imagen de galería):", result1.data.text);
-                    
-                    // Segunda pasada con diferente configuración
-                    await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789ABCDEFabcdef',
-                        tessedit_pageseg_mode: '6',
-                        scale: 2.0
-                    });
-                    
-                    const result2 = await worker.recognize(imageDataUrl);
-                    console.log("Segundo reconocimiento (imagen de galería):", result2.data.text);
-                    
-                    await worker.terminate();
-                    
-                    // Mismo proceso de análisis de candidatos que en processImage
-                    const candidates = [];
-                    
-                    // Extraer posibles UUID de cada resultado
-                    [result1.data.text, result2.data.text].forEach(text => {
-                        // Limpieza básica
-                        const cleanText = text.replace(/[^0-9a-fA-F]/gi, '');
-                        
-                        // Por longitud
-                        if (cleanText.length >= 16 && cleanText.length <= 24) {
-                            candidates.push(cleanText.substring(0, Math.min(cleanText.length, 24)));
-                        }
-                        
-                        // Por patrón
-                        const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
-                        const matches = text.match(uuidPattern);
-                        if (matches && matches.length > 0) {
-                            candidates.push(matches[0]);
-                        }
-                    });
-                    
-                    // Si no tenemos candidatos, extraer caracteres hexadecimales
-                    if (candidates.length === 0) {
-                        const allText = result1.data.text + " " + result2.data.text;
-                        let hexOnly = "";
-                        for (let i = 0; i < allText.length; i++) {
-                            if (/[0-9a-fA-F]/i.test(allText[i])) {
-                                hexOnly += allText[i];
-                            }
-                        }
-                        
-                        if (hexOnly.length >= 16) {
-                            candidates.push(hexOnly.substring(0, Math.min(hexOnly.length, 24)));
-                        }
-                    }
-                    
-                    // ¿Encontramos algún candidato?
-                    if (candidates.length > 0) {
-                        console.log("Candidatos de UUID encontrados (galería):", candidates);
-                        
-                        // Usar el candidato más largo que sea válido
-                        const validCandidates = candidates.filter(c => 
-                            c.length >= 16 && /^[0-9a-fA-F]+$/i.test(c));
-                        
-                        if (validCandidates.length > 0) {
-                            // Ordenar por longitud
-                            validCandidates.sort((a, b) => b.length - a.length);
-                            
-                            const bestCandidate = validCandidates[0];
-                            console.log("Mejor candidato seleccionado (galería):", bestCandidate);
-                            
-                            showResult(bestCandidate);
-                            
-                            // Guardar en historial
-                            scanHistory.unshift({
-                                uuid: bestCandidate,
-                                timestamp: new Date().toISOString()
-                            });
-                            saveHistory();
-                            renderHistory();
-                        } else {
-                            alert('No se pudo reconocer un UUID válido. Intente con otra imagen.');
-                        }
-                    } else {
-                        alert('No se encontró ningún UUID en la imagen seleccionada.');
-                    }
-                    
-                } catch (error) {
-                    console.error('Error en OCR:', error);
-                    alert('Error al procesar la imagen: ' + error.message);
-                } finally {
-                    loadingOverlay.classList.remove('visible');
-                }
-            };
-            
-            reader.onerror = () => {
-                loadingOverlay.classList.remove('visible');
-                alert('Error al leer el archivo');
-            };
-            
-            reader.readAsDataURL(file);
-        }
-        
-        // Cargar historial
-        function loadHistory() {
-            const savedHistory = localStorage.getItem('uuidScanHistory');
-            if (savedHistory) {
-                scanHistory = JSON.parse(savedHistory);
-                renderHistory();
-            }
-        }
-        
-        // Guardar historial
-        function saveHistory() {
-            // Mantener solo los últimos 10 elementos
-            if (scanHistory.length > 10) {
-                scanHistory = scanHistory.slice(0, 10);
-            }
-            localStorage.setItem('uuidScanHistory', JSON.stringify(scanHistory));
-        }
-        
-        // Renderizar historial
-        function renderHistory() {
-            if (scanHistory.length === 0) {
-                historyList.innerHTML = '<li class="empty-history">No hay registros recientes</li>';
-                return;
-            }
-            
-            historyList.innerHTML = '';
-            scanHistory.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'history-item';
-                li.innerHTML = `
-                    <span class="history-uuid">${item.uuid}</span>
-                    <span class="history-time">${formatDate(item.timestamp)}</span>
-                    <i class="fas fa-qrcode"></i>
-                `;
-                li.addEventListener('click', () => {
-                    showResult(item.uuid);
-                });
-                historyList.appendChild(li);
-            });
-        }
-        
-        // Formato de fecha
-        function formatDate(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
         
         // Iniciar cámara
@@ -795,107 +529,145 @@
                 // Detener cámara mientras procesamos
                 stopCamera();
                 
-                // Pre-procesar la imagen para mejorar el OCR
-                const enhancedImageUrl = await enhanceImageForOCR(croppedImageDataUrl);
-                
-                // Configurar Tesseract con idioma inglés
+                // Crear un trabajador de Tesseract
                 const worker = await Tesseract.createWorker({
                     logger: m => console.log(m)
                 });
                 
-                // Cargar solo el modelo esencial para mejorar la velocidad
+                // Cargar el modelo
                 await worker.loadLanguage('eng');
                 await worker.initialize('eng');
                 
-                // Configuración optimizada para UUIDs
+                // Primera pasada: optimizada para texto alfanumérico
                 await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789abcdefABCDEF',
-                    tessedit_pageseg_mode: '7', // Tratar como una sola línea de texto
-                    tessedit_ocr_engine_mode: '2', // Usar solo LSTM para más velocidad
-                    preserve_interword_spaces: '0',
+                    tessedit_char_whitelist: '0123456789ABCDEFabcdef',
+                    tessedit_pageseg_mode: '7', // Tratar como una sola línea
+                    preserve_interword_spaces: '0'
                 });
                 
-                // Primero procesar el área recortada mejorada (más rápido y preciso)
-                const { data: croppedData } = await worker.recognize(enhancedImageUrl);
+                // Procesar la imagen recortada
+                const result1 = await worker.recognize(croppedImageDataUrl);
+                console.log("Primer reconocimiento:", result1.data.text);
                 
-                // Buscar un patrón de 16-24 caracteres alfanuméricos
-                const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
-                // Limpiar texto (eliminar espacios y caracteres no deseados)
-                const croppedText = croppedData.text.replace(/[^0-9a-fA-F]/g, '');
+                // Segunda pasada: configuración alternativa
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789ABCDEFabcdef',
+                    tessedit_pageseg_mode: '6', // Asume un bloque de texto uniforme
+                    scale: 2.0, // Escalado para mejorar reconocimiento
+                    textord_min_linesize: 2.5
+                });
                 
-                // Verificar si el texto limpio tiene entre 16 y 24 caracteres
-                if (croppedText.length >= 16 && croppedText.length <= 24) {
-                    const uuid = croppedText.slice(0, Math.min(croppedText.length, 24));
-                    await worker.terminate();
-                    showResult(uuid);
-                    
-                    // Guardar en historial
-                    scanHistory.unshift({
-                        uuid: uuid,
-                        timestamp: new Date().toISOString()
-                    });
-                    saveHistory();
-                    renderHistory();
-                    return;
-                }
+                const result2 = await worker.recognize(croppedImageDataUrl);
+                console.log("Segundo reconocimiento:", result2.data.text);
                 
-                // Buscar patrones específicos en el texto reconocido
-                const croppedMatches = croppedData.text.match(uuidPattern);
-                if (croppedMatches && croppedMatches.length > 0) {
-                    await worker.terminate();
-                    showResult(croppedMatches[0]);
-                    
-                    // Guardar en historial
-                    scanHistory.unshift({
-                        uuid: croppedMatches[0],
-                        timestamp: new Date().toISOString()
-                    });
-                    saveHistory();
-                    renderHistory();
-                    return;
-                }
+                // Tercera pasada sin preprocesamiento
+                const result3 = await worker.recognize(fullImageDataUrl);
+                console.log("Tercer reconocimiento (imagen completa):", result3.data.text);
                 
-                // Como respaldo, intentar con la imagen completa
-                console.log("No se encontró UUID en el área enfocada, intentando con la imagen completa...");
-                
-                // Pre-procesar la imagen completa
-                const enhancedFullImageUrl = await enhanceImageForOCR(fullImageDataUrl);
-                
-                const { data: fullData } = await worker.recognize(enhancedFullImageUrl);
                 await worker.terminate();
                 
-                // Aplicar la misma lógica de limpieza a la imagen completa
-                const fullText = fullData.text.replace(/[^0-9a-fA-F]/g, '');
+                // Procesar los resultados
+                const candidates = [];
                 
-                if (fullText.length >= 16 && fullText.length <= 24) {
-                    const uuid = fullText.slice(0, Math.min(fullText.length, 24));
-                    showResult(uuid);
+                // Función para extraer UUID potencial y corregir caracteres problemáticos
+                const extractPotentialUuid = (text) => {
+                    // Corregir confusiones comunes primero
+                    let correctedText = text.replace(/g/gi, '9'); // Corregir 'g' por '9'
+                    correctedText = correctedText.replace(/o/gi, '0'); // Corregir 'o' por '0'
+                    correctedText = correctedText.replace(/l|i/gi, '1'); // Corregir 'l' o 'i' por '1'
+                    correctedText = correctedText.replace(/z/gi, '2'); // Corregir 'z' por '2'
+                    correctedText = correctedText.replace(/s/gi, '5'); // Corregir 's' por '5'
+                    correctedText = correctedText.replace(/b/gi, '6'); // Corregir 'b' por '6'
+                    correctedText = correctedText.replace(/t/gi, 'f'); // Corregir 't' por 'f' en algunos casos
                     
-                    // Guardar en historial
-                    scanHistory.unshift({
-                        uuid: uuid,
-                        timestamp: new Date().toISOString()
-                    });
-                    saveHistory();
-                    renderHistory();
-                    return;
+                    // Eliminar todos los caracteres no hexadecimales
+                    const cleanText = correctedText.replace(/[^0-9a-fA-F]/gi, '');
+                    
+                    // Solo buscar secuencias exactas de 16 caracteres hexadecimales
+                    const uuidPattern = /[0-9a-fA-F]{16}/gi;
+                    const matches = cleanText.match(uuidPattern);
+                    if (matches && matches.length > 0) {
+                        return matches[0];
+                    }
+                    
+                    // Si encontramos una secuencia más larga, tomar los primeros 16 caracteres
+                    if (cleanText.length >= 16) {
+                        return cleanText.slice(0, 16);
+                    }
+                    
+                    return null;
+                };
+                
+                // Recolectar candidatos de cada resultado
+                [result1.data.text, result2.data.text, result3.data.text].forEach(text => {
+                    const uuid = extractPotentialUuid(text);
+                    if (uuid) {
+                        candidates.push(uuid);
+                    }
+                });
+                
+                // Si no tenemos candidatos, intentemos una limpieza más agresiva
+                if (candidates.length === 0) {
+                    const allText = result1.data.text + " " + result2.data.text + " " + result3.data.text;
+                    console.log("Texto combinado para análisis: ", allText);
+                    
+                    // Corregir confusiones comunes
+                    let correctedText = allText.replace(/g/gi, '9');
+                    correctedText = correctedText.replace(/o/gi, '0');
+                    correctedText = correctedText.replace(/l|i/gi, '1');
+                    correctedText = correctedText.replace(/z/gi, '2');
+                    correctedText = correctedText.replace(/s/gi, '5');
+                    correctedText = correctedText.replace(/b/gi, '6');
+                    correctedText = correctedText.replace(/t/gi, 'f');
+                    
+                    // Extraer solo caracteres hexadecimales
+                    let hexOnly = "";
+                    for (let i = 0; i < correctedText.length; i++) {
+                        if (/[0-9a-fA-F]/i.test(correctedText[i])) {
+                            hexOnly += correctedText[i];
+                        }
+                    }
+                    
+                    console.log("Caracteres hexadecimales extraídos: ", hexOnly);
+                    
+                    if (hexOnly.length >= 16) {
+                        candidates.push(hexOnly.substring(0, 16));
+                    }
                 }
                 
-                const fullMatches = fullData.text.match(uuidPattern);
-                if (fullMatches && fullMatches.length > 0) {
-                    showResult(fullMatches[0]);
+                // ¿Encontramos algún candidato?
+                if (candidates.length > 0) {
+                    console.log("Candidatos de UUID encontrados:", candidates);
                     
-                    // Guardar en historial
-                    scanHistory.unshift({
-                        uuid: fullMatches[0],
-                        timestamp: new Date().toISOString()
-                    });
-                    saveHistory();
-                    renderHistory();
+                    // Filtrar solo los candidatos que tengan exactamente 16 caracteres
+                    const validCandidates = candidates.filter(c => 
+                        c.length === 16 && /^[0-9a-fA-F]+$/i.test(c));
+                    
+                    // Si no hay candidatos válidos de 16 caracteres, intentar con el mejor candidato disponible
+                    if (validCandidates.length > 0) {
+                        // Tomar el primer candidato válido
+                        const bestCandidate = validCandidates[0];
+                        console.log("Mejor candidato seleccionado:", bestCandidate);
+                        
+                        showResult(bestCandidate);
+                    } else if (candidates.length > 0) {
+                        // Si no tenemos exactamente 16 caracteres, usar el primero y ajustar a 16
+                        let bestCandidate = candidates[0];
+                        if (bestCandidate.length > 16) {
+                            bestCandidate = bestCandidate.substring(0, 16);
+                        } else if (bestCandidate.length < 16) {
+                            // Rellenar con ceros si falta
+                            bestCandidate = bestCandidate.padEnd(16, '0');
+                        }
+                        
+                        console.log("Candidato ajustado a 16 caracteres:", bestCandidate);
+                        showResult(bestCandidate);
+                    } else {
+                        alert('No se pudo reconocer un UUID válido. Intente capturar una imagen más clara.');
+                    }
                 } else {
-                    alert('No se encontró ningún UUID válido en la imagen');
+                    alert('No se encontró ningún UUID. Intente con mejor iluminación o ángulo diferente.');
                 }
-                
             } catch (error) {
                 console.error('Error en OCR:', error);
                 alert('Error al procesar la imagen: ' + error.message);
@@ -904,60 +676,15 @@
             }
         }
         
-        // Función para mejorar la imagen para OCR
-        async function enhanceImageForOCR(imageDataUrl) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    
-                    // Dibujar la imagen original
-                    ctx.drawImage(img, 0, 0, img.width, img.height);
-                    
-                    // Obtener datos de imagen
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const data = imageData.data;
-                    
-                    // Aumentar el contraste y mejorar la legibilidad
-                    const contrastFactor = 2; // Mayor contraste que antes
-                    const brightness = 10;    // Ligero aumento de brillo para texto oscuro
-                    
-                    for (let i = 0; i < data.length; i += 4) {
-                        // Ajustar brillo y contraste
-                        for (let j = 0; j < 3; j++) { // R, G, B channels
-                            // Aplicar contraste
-                            let value = data[i + j];
-                            value = ((value / 255 - 0.5) * contrastFactor + 0.5) * 255;
-                            
-                            // Aplicar brillo
-                            value += brightness;
-                            
-                            // Limitar valores a 0-255
-                            data[i + j] = Math.max(0, Math.min(255, value));
-                        }
-                    }
-                    
-                    // Aplicar los cambios
-                    ctx.putImageData(imageData, 0, 0);
-                    
-                    // Devolver la imagen mejorada
-                    resolve(canvas.toDataURL('image/jpeg', 0.95));
-                };
-                
-                img.src = imageDataUrl;
-            });
-        }
-        
         // Mostrar resultado
         function showResult(uuid) {
-            // Si el UUID tiene menos de 16 caracteres, mostrar un error
-            if (uuid.length < 16) {
-                alert('El UUID detectado es demasiado corto. Intente capturar la imagen nuevamente.');
-                return;
+            // Si el UUID tiene menos o más de 16 caracteres, ajustarlo
+            if (uuid.length !== 16) {
+                if (uuid.length > 16) {
+                    uuid = uuid.substring(0, 16);
+                } else {
+                    uuid = uuid.padEnd(16, '0');
+                }
             }
             
             // Asegurarse de que sea hexadecimal
@@ -966,17 +693,16 @@
                 return;
             }
             
-            // Limitar a 24 caracteres si es más largo
-            if (uuid.length > 24) {
-                uuid = uuid.substring(0, 24);
-            }
-            
             // Actualizar estado
             currentUuid = uuid;
             
-            // Mostrar UUID en la interfaz y hacer visible el contenedor de resultados
+            // Mostrar UUID en la interfaz
             uuidDisplay.textContent = uuid;
+            
+            // Generar código QR
             generateQRCode(uuid);
+            
+            // Mostrar el contenedor de resultados
             resultContainer.classList.add('visible');
             
             // Hacer scroll hacia el resultado
@@ -1019,11 +745,9 @@
                 });
         }
         
-        // Eliminar la función compartir ya que quitamos ese botón
         // Iniciar la app
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
-
 

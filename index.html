@@ -2,184 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#f44336">
     <title>Hex Scanner</title>
     <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkhleGFkZWNpbWFsIFNjYW5uZXIiLAogICJzaG9ydF9uYW1lIjogIkhleClTY2FuIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwKICAidGhlbWVfY29sb3IiOiAiI2Y0NDMzNiIsCiAgImljb25zIjogW10KfQ==">
-    <style>
-        :root {
-            --primary-color: #f44336;
-            --text-color: #333;
-            --background-color: #f5f5f5;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-        
-        header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-        
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            height: 180px;
-            margin-bottom: 1rem;
-            overflow: hidden;
-            background-color: #000;
-        }
-        
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .scanner-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 5cm;
-            height: 2cm;
-            border: 2px solid var(--primary-color);
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-        }
-        
-        .result-container {
-            width: 100%;
-            max-width: 500px;
-            padding: 1rem;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-        
-        #hexInput {
-            width: 100%;
-            padding: 0.75rem;
-            font-size: 1.2rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            font-family: monospace;
-        }
-        
-        #qrCode {
-            display: flex;
-            justify-content: center;
-            margin: 1rem 0;
-        }
-        
-        #qrCode img {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        .control-buttons {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-        
-        button {
-            padding: 0.75rem 1rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            flex: 1;
-        }
-        
-        button:disabled {
-            background-color: #ccc;
-        }
-        
-        .hex-error {
-            color: var(--primary-color);
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .success-notification {
-            background-color: #4CAF50;
-            color: white;
-            padding: 0.75rem;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            text-align: center;
-            animation: fadeOut 3s forwards;
-            animation-delay: 2s;
-        }
-        
-        @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
-        }
-        
-        @media (max-width: 600px) {
-            .camera-container {
-                height: 30vh;
-            }
-            
-            #qrCode {
-                max-height: 200px;
-            }
-            
-            #qrCode img {
-                max-width: 160px;
-                max-height: 160px;
-            }
-        }
-    </style>
-
     <script>
-        // Prevenir el comportamiento de caché de iOS
         window.addEventListener('pageshow', function(event) {
             if (event.persisted) {
                 window.location.reload();
             }
         });
-
-        // Manejar problemas de scroll en iOS
         if ('scrollRestoration' in history) {
             history.scrollRestoration = 'manual';
         }
     </script>
+    [Aquí va todo el CSS que está en el código anterior]
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.5/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -222,56 +62,54 @@
         const notificationDiv = document.getElementById('notification');
         
         let stream = null;
-        let qrCode = null;
         let scanning = false;
+        let isProcessing = false;
         let canvas = null;
-        let qrInstance = null;
         
-        // Comprobar si el navegador soporta Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => {
-                    console.log('Service Worker registro fallido:', err);
-                });
-            });
+        // Crear canvas para zoom
+        const zoomedDisplayCanvas = document.createElement('canvas');
+        zoomedDisplayCanvas.width = 400;
+        zoomedDisplayCanvas.height = 160;
+        zoomedDisplayCanvas.className = 'zoomed-display';
+        
+        // Preparar contenedor de zoom
+        function setupZoomContainer() {
+            const overlay = document.querySelector('.scanner-overlay');
+            if (!overlay) return null;
+            
+            const zoomViewContainer = document.createElement('div');
+            zoomViewContainer.className = 'zoom-view-container';
+            zoomViewContainer.style.position = 'absolute';
+            zoomViewContainer.style.top = '0';
+            zoomViewContainer.style.left = '0';
+            zoomViewContainer.style.width = '100%';
+            zoomViewContainer.style.height = '100%';
+            zoomViewContainer.style.overflow = 'hidden';
+            zoomViewContainer.style.display = 'none';
+            
+            zoomViewContainer.appendChild(zoomedDisplayCanvas);
+            overlay.appendChild(zoomViewContainer);
+            
+            return zoomViewContainer;
         }
         
         // Inicializar la aplicación
         async function init() {
             try {
-                // Configurar el escucha para validar la entrada
+                setupZoomContainer();
                 hexInput.addEventListener('input', validateHexInput);
-                
-                // Configurar botones
                 scanButton.addEventListener('click', toggleScan);
                 generateButton.addEventListener('click', generateQR);
-                
-                // Configurar la vista ampliada en el rectángulo
-                const zoomViewContainer = setupEnhancedOverlay();
-                
-                // Intentar iniciar la cámara automáticamente
                 await startCamera();
-                
-                // Pre-inicializar Tesseract para que esté listo
-                setTimeout(() => {
-                    Tesseract.recognize(
-                        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==',
-                        'eng',
-                        { logger: m => console.log(m) }
-                    ).finally(() => {
-                        console.log('Tesseract inicializado');
-                    });
-                }, 500);
             } catch (error) {
                 console.error('Error al inicializar:', error);
-                statusDiv.textContent = 'Error al inicializar la cámara: ' + error.message;
+                statusDiv.textContent = 'Error al inicializar: ' + error.message;
             }
         }
         
         // Iniciar la cámara
         async function startCamera() {
             try {
-                // Solicitar permisos de cámara con restricciones
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: 'environment',
@@ -281,66 +119,15 @@
                     audio: false
                 });
                 
-                // Asignar el stream al elemento de video
                 video.srcObject = stream;
-                
-                // Actualizar estado
-                statusDiv.textContent = 'Cámara activa. Pulse "Escanear" para capturar.';
+                statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
             } catch (error) {
                 console.error('Error al acceder a la cámara:', error);
                 statusDiv.textContent = 'No se pudo acceder a la cámara: ' + error.message;
             }
         }
         
-        // Crear elementos para zoom
-        const zoomedDisplayCanvas = document.createElement('canvas');
-        zoomedDisplayCanvas.className = 'zoomed-display';
-        let zoomContext = null;
-        
-        // Ajustar estilo del rectángulo rojo para incluir vista ampliada
-        function setupEnhancedOverlay() {
-            const overlay = document.querySelector('.scanner-overlay');
-            if (!overlay) return;
-            
-            // Añadir un contenedor para la vista ampliada dentro del rectángulo
-            const zoomViewContainer = document.createElement('div');
-            zoomViewContainer.className = 'zoom-view-container';
-            zoomViewContainer.style.position = 'absolute';
-            zoomViewContainer.style.top = '0';
-            zoomViewContainer.style.left = '0';
-            zoomViewContainer.style.width = '100%';
-            zoomViewContainer.style.height = '100%';
-            zoomViewContainer.style.overflow = 'hidden';
-            zoomViewContainer.style.display = 'none'; // Inicialmente oculto
-            
-            // Añadir canvas para la vista ampliada
-            zoomViewContainer.appendChild(zoomedDisplayCanvas);
-            zoomedDisplayCanvas.style.width = '100%';
-            zoomedDisplayCanvas.style.height = '100%';
-            zoomedDisplayCanvas.width = 400;  // Tamaño interno del canvas
-            zoomedDisplayCanvas.height = 160;
-            
-            // Añadir al rectángulo rojo
-            overlay.appendChild(zoomViewContainer);
-            
-            return zoomViewContainer;
-        }
-        
-        // Detener la cámara
-        function stopCamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-                stream = null;
-            }
-            
-            // Ocultar vista ampliada si existe
-            if (zoomedDisplayCanvas) {
-                zoomedDisplayCanvas.style.display = 'none';
-            }
-        }
-        
-        // Alternar entre escanear y detener
+        // Alternar escaneo
         function toggleScan() {
             if (scanning) {
                 stopScanning();
@@ -349,276 +136,139 @@
             }
         }
         
-        // Iniciar el proceso de escaneo
+        // Iniciar escaneo
         function startScanning() {
             scanning = true;
-            isProcessing = false; // Reiniciar la bandera de procesamiento
+            isProcessing = false;
             scanButton.textContent = 'Detener';
             statusDiv.textContent = 'Capturando...';
             
-            // Mostrar vista ampliada dentro del rectángulo
             const zoomViewContainer = document.querySelector('.zoom-view-container');
             if (zoomViewContainer) {
                 zoomViewContainer.style.display = 'block';
             }
             
-            // Crear canvas para capturar la imagen si no existe
             if (!canvas) {
                 canvas = document.createElement('canvas');
             }
             
-            // Reiniciar el worker de Tesseract
-            Tesseract.terminate();
-            
-            // Iniciar el proceso de captura periódica
-            captureAndProcess();
+            requestAnimationFrame(captureAndProcess);
         }
         
-        // Detener el proceso de escaneo
+        // Detener escaneo
         function stopScanning() {
             scanning = false;
             isProcessing = false;
             scanButton.textContent = 'Capturar';
             statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
             
-            // Ocultar vista ampliada
             const zoomViewContainer = document.querySelector('.zoom-view-container');
             if (zoomViewContainer) {
                 zoomViewContainer.style.display = 'none';
             }
-            
-            // Cancelar cualquier reconocimiento en curso
-            Tesseract.terminate();
         }
         
-        // Variable para controlar si se está procesando una imagen
-        let isProcessing = false;
-        let tesseractWorker = null;
-        
-        // Inicializar el worker de Tesseract una sola vez
-        function initTesseract() {
-            if (!tesseractWorker) {
-                tesseractWorker = Tesseract.createWorker({
-                    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/worker.min.js',
-                    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-                    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@2.2.0/tesseract-core.wasm.js',
-                    logger: message => console.log(message)
-                });
-            }
-            return tesseractWorker;
-        }
-        
-        // Capturar y procesar la imagen
+        // Capturar y procesar imagen
         async function captureAndProcess() {
             if (!scanning) return;
-// Si ya estamos procesando, no iniciar otro proceso
-if (isProcessing) {
-            requestAnimationFrame(captureAndProcess);
-            return;
-        }
-        
-        // Marcar que estamos procesando
-        isProcessing = true;
-        
-        try {
-            // Evitar procesar imágenes si la cámara no está lista o si no estamos escaneando
-            if (!video.videoWidth || !scanning) {
-                isProcessing = false;
+            
+            if (isProcessing) {
+                requestAnimationFrame(captureAndProcess);
                 return;
             }
             
-            // Ajustar canvas al tamaño del video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            isProcessing = true;
             
-            // Obtener el contexto y dibujar el frame actual
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Calcular las coordenadas de la región de interés (el rectángulo rojo)
-            const videoRect = video.getBoundingClientRect();
-            const overlayRect = document.querySelector('.scanner-overlay').getBoundingClientRect();
-            
-            // Convertir coordenadas de la pantalla a coordenadas del video
-            const scaleX = canvas.width / videoRect.width;
-            const scaleY = canvas.height / videoRect.height;
-            
-            const cropX = (overlayRect.left - videoRect.left) * scaleX;
-            const cropY = (overlayRect.top - videoRect.top) * scaleY;
-            const cropWidth = overlayRect.width * scaleX;
-            const cropHeight = overlayRect.height * scaleY;
-            
-            // Crear vista ampliada dentro del rectángulo rojo
-            if (scanning) {
+            try {
+                if (video.readyState < 2 || !scanning) {
+                    isProcessing = false;
+                    requestAnimationFrame(captureAndProcess);
+                    return;
+                }
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const videoRect = video.getBoundingClientRect();
+                const overlayRect = document.querySelector('.scanner-overlay').getBoundingClientRect();
+                
+                const scaleX = canvas.width / videoRect.width;
+                const scaleY = canvas.height / videoRect.height;
+                
+                const cropX = Math.max(0, (overlayRect.left - videoRect.left) * scaleX);
+                const cropY = Math.max(0, (overlayRect.top - videoRect.top) * scaleY);
+                const cropWidth = Math.min(overlayRect.width * scaleX, canvas.width - cropX);
+                const cropHeight = Math.min(overlayRect.height * scaleY, canvas.height - cropY);
+                
                 const zoomViewContainer = document.querySelector('.zoom-view-container');
                 if (zoomViewContainer && zoomViewContainer.style.display !== 'none') {
-                    if (!zoomContext) {
-                        zoomContext = zoomedDisplayCanvas.getContext('2d');
-                    }
+                    const zoomContext = zoomedDisplayCanvas.getContext('2d');
                     
-                    // Dibujar directamente la imagen capturada en el canvas de zoom
                     zoomContext.drawImage(
-                        video,
-                        cropX, cropY, cropWidth, cropHeight,  // Región fuente
-                        0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height  // Destino completo
+                        canvas, 
+                        cropX, cropY, cropWidth, cropHeight,
+                        0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height
                     );
-                    
-                    // Aplicar efecto de mejora de contraste para mejor visualización
-                    const zoomImageData = zoomContext.getImageData(0, 0, zoomedDisplayCanvas.width, zoomedDisplayCanvas.height);
-                    const zoomData = zoomImageData.data;
-                    
-                    // Aumentar contraste para mejor visualización
-                    for (let i = 0; i < zoomData.length; i += 4) {
-                        // Aplicar ajuste de brillo y contraste
-                        zoomData[i] = Math.min(255, zoomData[i] * 1.2);     // R
-                        zoomData[i + 1] = Math.min(255, zoomData[i + 1] * 1.2); // G
-                        zoomData[i + 2] = Math.min(255, zoomData[i + 2] * 1.2); // B
-                    }
-                    
-                    zoomContext.putImageData(zoomImageData, 0, 0);
                 }
-            }
-            
-            // Extraer la región de interés
-            const imageData = ctx.getImageData(cropX, cropY, cropWidth, cropHeight);
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = cropWidth;
-            tempCanvas.height = cropHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(imageData, 0, 0);
-            
-            // Procesar la imagen con un límite de tiempo para evitar bloqueos
-            statusDiv.textContent = 'Procesando imagen...';
-            
-            // Límite de tiempo para el reconocimiento (evitar reconocimientos eternos)
-            const recognitionTimeout = 3000; // 3 segundos máximo por reconocimiento
-            
-            // Crear una promesa que se resuelve con el resultado o se rechaza después del tiempo límite
-            const recognitionWithTimeout = Promise.race([
-                Tesseract.recognize(tempCanvas, 'eng', {
-                    tessedit_char_whitelist: '0123456789abcdef',
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    tessedit_char_blacklist: 'gGiIlLoO',
-                    tessedit_enable_dict_correction: '0',
-                    tessedit_pageseg_mode: '7',
-                    tessedit_ocr_engine_mode: '2',
-                    tessjs_image_pre_multiplier: '2',
-                    tessjs_create_box: '1'
-                }),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Tiempo de reconocimiento excedido")), recognitionTimeout)
-                )
-            ]);
-            
-            const result = await recognitionWithTimeout;
-            
-            // Extraer el texto reconocido y limpiarlo
-            let recognizedText = result.data.text.trim().toLowerCase();
-            
-            // Eliminar espacios y saltos de línea
-            recognizedText = recognizedText.replace(/[\s\n\r]/g, '');
-            
-            // Correcciones específicas para caracteres problemáticos
-            recognizedText = recognizedText
-                .replace(/g/g, '9')  // Corregir 'g' confundida con '9'
-                .replace(/i/g, '1')  // Corregir 'i' confundida con '1'
-                .replace(/l/g, '1')  // Corregir 'l' confundida con '1'
-                .replace(/o/g, '0')  // Corregir 'o' confundida con '0'
-                .replace(/z/g, '2')  // Corregir 'z' confundida con '2'
-                .replace(/s/g, '5')  // Corregir 's' confundida con '5'
-                .replace(/t/g, 'f')  // Corregir 't' confundida con 'f'
-                .replace(/B/g, '8')  // Corregir 'B' confundida con '8'
-                .replace(/b/g, '6')  // Corregir 'b' confundida con '6'
                 
-            // Correcciones adicionales para 8 y 9
-            // Si hay algún carácter ambiguo entre 8 y 9, analizamos el contexto
-            recognizedText = recognizedText.replace(/[8B]/g, (match, index, string) => {
-                // Si parece un 8, lo dejamos como 8
-                return '8';
-            });
-            recognizedText = recognizedText.replace(/[9g]/g, (match, index, string) => {
-                // Si parece un 9, lo dejamos como 9
-                return '9';
-            });
-            
-            // Filtrar solo caracteres hexadecimales
-            recognizedText = recognizedText.replace(/[^0-9a-f]/g, '');
-            
-            // Si hay al menos algunos caracteres hexadecimales reconocidos
-            if (recognizedText && recognizedText.length > 0) {
-                console.log('Texto reconocido:', recognizedText);
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = cropWidth;
+                tempCanvas.height = cropHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(
+                    canvas, 
+                    cropX, cropY, cropWidth, cropHeight, 
+                    0, 0, cropWidth, cropHeight
+                );
                 
-                // Si encontramos exactamente 16 caracteres, consideramos que es un éxito
-                if (recognizedText.length === 16) {
-                    hexInput.value = recognizedText;
+                statusDiv.textContent = 'Procesando imagen...';
+                
+                const result = await Tesseract.recognize(
+                    tempCanvas, 
+                    'eng', 
+                    {
+                        tessedit_char_whitelist: '0123456789abcdef',
+                        tessedit_char_blacklist: 'gGiIlLoO',
+                        tessjs_create_osd: '0',
+                        tessedit_pageseg_mode: '7',
+                        tessedit_ocr_engine_mode: '3'
+                    }
+                );
+                
+                let recognizedText = result.data.text.trim().toLowerCase()
+                    .replace(/[\s\n\r]/g, '')
+                    .replace(/[^0-9a-f]/g, '');
+                
+                if (recognizedText && recognizedText.length >= 16) {
+                    const hexString = recognizedText.substring(0, 16);
+                    
+                    hexInput.value = hexString;
                     validateHexInput();
                     
-                    // Detener el escaneo inmediatamente
-                    scanning = false;
-                    scanButton.textContent = 'Capturar';
-                    
-                    // Ocultar vista ampliada
-                    const zoomViewContainer = document.querySelector('.zoom-view-container');
-                    if (zoomViewContainer) {
-                        zoomViewContainer.style.display = 'none';
-                    }
-                    
-                    // Mostrar notificación de éxito
-                    showNotification('¡Cadena hexadecimal detectada con éxito!');
-                    
-                    // Generar QR automáticamente
+                    stopScanning();
                     generateQR();
-                    
-                    // Actualizar estado
-                    statusDiv.textContent = 'Captura completada. Código QR generado.';
-                    
+                    showNotification('¡Cadena hexadecimal detectada!');
                     return;
-                } else if (recognizedText.length > 16) {
-                    // Si hay más de 16 caracteres, tomamos los primeros 16
-                    hexInput.value = recognizedText.substring(0, 16);
-                    validateHexInput();
-                } else {
-                    // Si hay menos de 16 caracteres, actualizamos el campo de texto
-                    // pero seguimos escaneando
-                    hexInput.value = recognizedText;
-                    validateHexInput();
                 }
-            }
-            
-            // Marcar que hemos terminado de procesar
-            isProcessing = false;
-            
-            // Continuar escaneando si no se detuvo
-            if (scanning) {
-                // Capturar inmediatamente el siguiente frame para mayor velocidad
+                
+                isProcessing = false;
+                requestAnimationFrame(captureAndProcess);
+                
+            } catch (error) {
+                console.error('Error en captura:', error);
+                
+                isProcessing = false;
+                statusDiv.textContent = 'Error: ' + error.message;
+                
                 requestAnimationFrame(captureAndProcess);
             }
-        } catch (error) {
-            console.error('Error al procesar la imagen:', error);
-            
-            if (error.message === "Tiempo de reconocimiento excedido") {
-                statusDiv.textContent = 'El reconocimiento está tomando demasiado tiempo. Reintentando...';
-                // Forzar la terminación del worker de Tesseract para evitar que se quede colgado
-                Tesseract.terminate();
-            } else {
-                statusDiv.textContent = 'Error: ' + error.message;
-            }
-            
-            // Marcar que hemos terminado de procesar incluso con error
-            isProcessing = false;
-            
-            // Reintentar solo si seguimos en modo escaneo
-            if (scanning) {
-                // Pequeña pausa antes de reintentar
-                setTimeout(() => {
-                    requestAnimationFrame(captureAndProcess);
-                }, 100);
-            }
         }
-    }
-// Validar la entrada hexadecimal
-function validateHexInput() {
+        
+        // Validar entrada hexadecimal
+        function validateHexInput() {
             const value = hexInput.value.trim().toLowerCase();
             const isValid = /^[0-9a-f]{16}$/.test(value);
             
@@ -638,16 +288,9 @@ function validateHexInput() {
         function generateQR() {
             const value = hexInput.value.trim();
             
-            // Detener el proceso de captura si está activo
-            if (scanning) {
-                stopScanning();
-            }
-            
-            // Vaciar el contenedor de QR
             qrCodeDiv.innerHTML = '';
             
-            // Crear instancia de QRCode con tamaño reducido
-            qrInstance = new QRCode(qrCodeDiv, {
+            new QRCode(qrCodeDiv, {
                 text: value,
                 width: 160,
                 height: 160,
@@ -656,7 +299,8 @@ function validateHexInput() {
                 correctLevel: QRCode.CorrectLevel.H
             });
             
-            statusDiv.textContent = 'Código QR generado para: ' + value;
+            qrCodeDiv.style.display = 'block';
+            statusDiv.textContent = 'Código QR generado: ' + value;
         }
         
         // Mostrar notificación
@@ -664,7 +308,6 @@ function validateHexInput() {
             notificationDiv.textContent = message;
             notificationDiv.className = 'success-notification';
             
-            // Ocultar después de la animación
             setTimeout(() => {
                 notificationDiv.className = 'hidden';
             }, 5000);
@@ -676,12 +319,10 @@ function validateHexInput() {
         // Manejar eventos de visibilidad de la página
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                // La página está oculta, detener la cámara para ahorrar recursos
                 if (scanning) {
                     stopScanning();
                 }
             } else {
-                // La página está visible de nuevo, reiniciar la cámara si es necesario
                 if (!stream) {
                     startCamera();
                 }
@@ -689,4 +330,4 @@ function validateHexInput() {
         });
     </script>
 </body>
-</html>    
+</html>

@@ -1,10 +1,8 @@
-const CACHE_NAME = 'hex-scanner-windows-v1';
+const CACHE_NAME = 'hex-scanner-v1';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon-192x192.png',
-  './icon-512x512.png',
   'https://cdn.jsdelivr.net/npm/tesseract.js@4.0.3/dist/tesseract.min.js',
   'https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js'
 ];

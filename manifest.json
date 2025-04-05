@@ -1,7 +1,7 @@
 {
-    "name": "Escáner Hexadecimal - Mercadona",
-    "short_name": "HexScanM",
-    "description": "Herramienta para capturar códigos hexadecimales",
+    "name": "Escáner Hexadecimal",
+    "short_name": "HexScan",
+    "description": "Captura códigos hexadecimales con OCR avanzado",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#ffffff",
@@ -19,22 +19,6 @@
         "sizes": "512x512",
         "type": "image/png",
         "purpose": "any maskable"
-      }
-    ],
-    "screenshots": [
-      {
-        "src": "screenshot.png",
-        "sizes": "1280x720",
-        "type": "image/png",
-        "platform": "windows"
-      }
-    ],
-    "file_handlers": [
-      {
-        "action": "./index.html",
-        "accept": {
-          "text/*": [".txt"]
-        }
       }
     ],
     "shortcuts": [

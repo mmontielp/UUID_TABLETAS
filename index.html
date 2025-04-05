@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hex Scanner - Windows</title>
+    <title>Escáner Hexadecimal</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2196F3">
+    <meta name="theme-color" content="#00843D">
     <style>
         * {
             box-sizing: border-box;
@@ -15,46 +15,49 @@
         }
         
         body {
-            background-color: #f5f5f5;
+            background-color: #ecf0f1;
             color: #333;
             line-height: 1.6;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            padding: 10px;
+            width: 100%;
+            margin: 0;
         }
         
         .container {
-            display: grid;
-            grid-template-columns: 1fr 300px;
+            display: flex;
+            flex-wrap: wrap;
+            width: 100%;
             gap: 20px;
         }
         
-        header {
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        h1 {
-            color: #2196F3;
-        }
-        
-        .column {
+        .main-column {
+            flex: 1;
+            min-width: 300px;
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 15px;
-            width: 100%;
+        }
+        
+        .sidebar {
+            flex: 1;
+            min-width: 300px;
+            max-width: 55%;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 15px;
         }
         
         .camera-container {
             position: relative;
             width: 100%;
-            height: 300px; /* Reducido de 400px a 300px */
+            height: 300px;
             margin-bottom: 20px;
             background-color: #000;
             border-radius: 8px;
             overflow: hidden;
+            border: 3px solid #00843D;
         }
         
         #video {
@@ -68,9 +71,9 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 50%; /* Reducido de 70% a 50% */
-            height: 60px; /* Reducido de 80px a 60px */
-            border: 3px solid #FFEB3B; /* Cambiado de #2196F3 (azul) a #FFEB3B (amarillo) */
+            width: 50%;
+            height: 60px;
+            border: 3px solid #FFEB3B;
             border-radius: 4px;
             z-index: 10;
             pointer-events: none;
@@ -84,7 +87,7 @@
         }
         
         button {
-            background-color: #2196F3;
+            background-color: #00843D;
             color: white;
             border: none;
             border-radius: 4px;
@@ -95,7 +98,7 @@
         }
         
         button:hover {
-            background-color: #0b7dda;
+            background-color: #006e33;
         }
         
         button:disabled {
@@ -104,19 +107,29 @@
         }
         
         button.danger {
-            background-color: #f44336;
+            background-color: #e74c3c;
         }
         
         button.danger:hover {
-            background-color: #d32f2f;
+            background-color: #c0392b;
+        }
+        
+        /* Botones más pequeños para acciones en historial */
+        button.action-btn {
+            padding: 5px 8px;
+            font-size: 12px;
+            min-width: 30px;
         }
         
         input {
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            width: 100%;
             margin-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
         }
         
         .result-container {
@@ -124,7 +137,7 @@
             padding: 15px;
             background-color: #f9f9f9;
             border-radius: 4px;
-            border-left: 4px solid #2196F3;
+            border-left: 4px solid #00843D;
         }
         
         .qr-container {
@@ -144,18 +157,14 @@
             overflow-y: auto;
         }
         
-        .capture-history {
-            width: 100%;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        
         .history-item {
-            padding: 10px;
+            padding: 8px;
             border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 14px;
+            width: 100%;
         }
         
         .history-item:last-child {
@@ -165,13 +174,18 @@
         .history-content {
             font-family: monospace;
             word-break: break-all;
+            padding-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+            max-width: calc(100% - 120px);
         }
         
         .history-actions {
             display: flex;
             gap: 5px;
-            flex-shrink: 0; /* Evita que los botones se compriman */
-            white-space: nowrap;
+            flex-shrink: 0;
         }
         
         .tooltip {
@@ -201,18 +215,33 @@
             opacity: 1;
         }
         
-        #canvas {
-            display: none;
+        .zoom-controls {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
         
-        .flash {
-            animation: flash-animation 0.3s;
+        .zoom-controls button {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #00843D;
         }
         
-        @keyframes flash-animation {
-            0% { background-color: rgba(255, 255, 255, 0); }
-            50% { background-color: rgba(255, 255, 255, 0.8); }
-            100% { background-color: rgba(255, 255, 255, 0); }
+        .zoom-controls button:hover {
+            background-color: rgba(255, 255, 255, 0.9);
         }
         
         .status {
@@ -223,24 +252,22 @@
         }
         
         .status.success {
-            background-color: #e8f5e9;
-            color: #388e3c;
+            background-color: #e6f7ef;
+            color: #00843D;
         }
         
         .status.error {
             background-color: #ffebee;
-            color: #d32f2f;
+            color: #e74c3c;
         }
         
         .status.info {
             background-color: #e3f2fd;
-            color: #1976d2;
+            color: #00843D;
         }
         
-        @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
+        .hidden {
+            display: none;
         }
         
         .edit-result-container {
@@ -269,40 +296,20 @@
             gap: 10px;
         }
         
-        .zoom-controls {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        
-        .zoom-controls button {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.5);
-            border: none;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .zoom-controls button:hover {
-            background-color: rgba(255, 255, 255, 0.8);
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                max-width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Se ha eliminado el logo de Mercadona -->
-    
     <div class="container">
-        <div class="column main-column">
+        <div class="main-column">
             <div class="camera-container">
                 <video id="video" playsinline autoplay></video>
                 <div class="capture-zone"></div>
@@ -325,23 +332,22 @@
             </div>
             
             <div id="status" class="status info">
-                Listo para capturar. Use la webcam y posicione el código en el rectángulo azul.
+                Listo para capturar. Use la webcam y posicione el código en el rectángulo amarillo.
             </div>
             
             <div id="resultContainer" class="result-container hidden">
                 <div id="resultText"></div>
+                <div class="edit-result-container">
+                    <button id="editCaptureBtn" class="action-btn">Editar captura</button>
+                </div>
                 <div class="qr-container">
                     <h3>Código QR generado:</h3>
                     <div id="qrcode"></div>
                 </div>
             </div>
-            
-            <div class="shortcut-info">
-                <p><strong>Atajo de teclado:</strong> Presione la barra espaciadora para capturar</p>
-            </div>
         </div>
         
-        <div class="column sidebar">
+        <div class="sidebar">
             <h2 style="color: #00843D; border-bottom: 2px solid #00843D; padding-bottom: 8px;">Historial de Capturas</h2>
             <div id="captureHistory" class="capture-history">
                 <p style="text-align: center; color: #888; padding: 20px;">No hay capturas todavía</p>
@@ -423,8 +429,6 @@
                         // Configurar para reconocimiento preciso aunque sea más lento
                         tessjs_create_hocr: '0',
                         tessjs_create_tsv: '0',
-                        // Aumentar la precisión y quitar atajos
-                        tessedit_do_invert: '0',
                         // Evitar correcciones automáticas del OCR
                         language_model_penalty_non_dict_word: '0',
                         language_model_penalty_non_freq_dict_word: '0',
@@ -509,6 +513,12 @@
             if (zoomInBtn && zoomOutBtn) {
                 zoomInBtn.addEventListener('click', () => adjustZoom(0.5)); // Incrementar zoom en 0.5x
                 zoomOutBtn.addEventListener('click', () => adjustZoom(-0.5)); // Reducir zoom en 0.5x
+            }
+            
+            // Listener para editar capturas
+            const editCaptureBtn = document.getElementById('editCaptureBtn');
+            if (editCaptureBtn) {
+                editCaptureBtn.addEventListener('click', startEditCapture);
             }
         }
         
@@ -614,6 +624,104 @@
             }
         }
         
+        // Pre-procesar la imagen para mejorar el OCR
+        function preprocessImage(canvas) {
+            const ctx = canvas.getContext('2d');
+            
+            // Primer paso: Aumentar el tamaño para mejorar la resolución
+            const scaleFactor = 3.0; // Mayor escala para mejor detalle
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width * scaleFactor;
+            tempCanvas.height = canvas.height * scaleFactor;
+            
+            // Dibujar la imagen escalada sin suavizado para preservar bordes nítidos
+            tempCtx.imageSmoothingEnabled = false;
+            tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Copiar al canvas original
+            canvas.width = tempCanvas.width;
+            canvas.height = tempCanvas.height;
+            ctx.drawImage(tempCanvas, 0, 0);
+            
+            // Segundo paso: Mejorar el contraste para texto más claro
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Análisis de luminosidad
+            const luminosities = [];
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                // Fórmula de luminosidad perceptual
+                const luminosity = 0.299 * r + 0.587 * g + 0.114 * b;
+                luminosities.push(luminosity);
+            }
+            
+            // Calculamos histograma para mejor adaptación
+            const histogram = Array(256).fill(0);
+            luminosities.forEach(l => histogram[Math.floor(l)]++);
+            
+            // Encontrar umbrales para mejorar el contraste (técnica de Otsu simplificada)
+            let sum = 0;
+            let sumB = 0;
+            let wB = 0;
+            let wF = 0;
+            let total = luminosities.length;
+            let varMax = 0;
+            let threshold = 0;
+            
+            for (let t = 0; t < 256; t++) {
+                wB += histogram[t];
+                if (wB === 0) continue;
+                
+                wF = total - wB;
+                if (wF === 0) break;
+                
+                sumB += t * histogram[t];
+                const mB = sumB / wB;
+                const mF = (sum - sumB) / wF;
+                
+                const varBetween = wB * wF * (mB - mF) * (mB - mF);
+                
+                if (varBetween > varMax) {
+                    varMax = varBetween;
+                    threshold = t;
+                }
+            }
+            
+            // Aplicamos el umbral óptimo para binarización
+            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                if (luminosities[j] > threshold) {
+                    // Pixel claro -> blanco
+                    data[i] = 255;
+                    data[i + 1] = 255;
+                    data[i + 2] = 255;
+                } else {
+                    // Pixel oscuro -> negro
+                    data[i] = 0;
+                    data[i + 1] = 0;
+                    data[i + 2] = 0;
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Guardar la imagen procesada para depuración si es necesario
+            if (window.debugMode) {
+                window.processedImage = canvas.toDataURL('image/png');
+                console.log("Imagen procesada disponible en window.processedImage");
+                
+                // Mostrar la imagen procesada para depuración
+                const debugImg = document.createElement('img');
+                debugImg.src = window.processedImage;
+                debugImg.style.maxWidth = '100%';
+                debugImg.style.border = '1px solid green';
+                document.body.appendChild(debugImg);
+            }
+        }
+        
         // Procesar imagen con OCR
         async function processWithOCR(canvas) {
             updateStatus('Procesando imagen con OCR...', 'info');
@@ -625,28 +733,28 @@
                 // Obtener el worker (ya inicializado)
                 const worker = await window.tesseractWorker;
                 
-                // Como worker.reset() no está disponible, reinicializamos el worker completamente
-                // Volver a configurar el worker para asegurar que no haya contaminación entre ejecuciones
+                // Reinicializar para asegurar reconocimiento limpio
                 await worker.loadLanguage('eng');
                 await worker.initialize('eng');
+                
+                // Configuración optimizada para reconocimiento preciso de hexadecimal
                 await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789abcdef',
                     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión en texto simple
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    tessjs_create_box: '0',
-                    tessjs_create_unlv: '0',
-                    tessjs_create_osd: '0',
+                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión
+                    // Evitar correcciones automáticas del OCR
+                    language_model_penalty_non_dict_word: '0',
+                    language_model_penalty_non_freq_dict_word: '0',
                 });
                 
                 // Realizar OCR en la imagen
                 const { data } = await worker.recognize(canvas);
                 
-                // Limpiar el texto reconocido - eliminar caracteres no hexadecimales
-                let recognizedText = data.text.replace(/[^0-9a-f]/gi, '').toLowerCase();
+                // Limpiar el texto reconocido - solo eliminar espacios y caracteres no imprimibles
+                let recognizedText = data.text.trim().toLowerCase().replace(/\s+/g, '');
                 
-                // Mostrar el texto reconocido tal cual (sin reemplazos)
+                // Filtrar solo caracteres hexadecimales, sin reemplazos
+                recognizedText = recognizedText.replace(/[^0-9a-f]/gi, '');
+                
                 console.log("Texto reconocido:", recognizedText);
                 
                 // Si tenemos exactamente 16 caracteres y todos son hexadecimales válidos
@@ -674,95 +782,6 @@
             } catch (error) {
                 updateStatus(`Error en el procesamiento OCR: ${error.message}`, 'error');
                 console.error('Error en OCR:', error);
-            }
-        }
-        
-        // Pre-procesar la imagen para mejorar el OCR
-        function preprocessImage(canvas) {
-            const ctx = canvas.getContext('2d');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            
-            // Primer paso: Convertir a escala de grises y calcular el brillo promedio
-            let totalBrightness = 0;
-            let pixelValues = [];
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Convertir a escala de grises con ponderación para mejor OCR
-                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                pixelValues.push(gray);
-                totalBrightness += gray;
-            }
-            
-            // Calcular el brillo promedio y ajustar el umbral
-            const avgBrightness = totalBrightness / pixelValues.length;
-            
-            // Determinar umbral basado en el brillo de la imagen
-            // Para imágenes más oscuras, usar un umbral más bajo para preservar caracteres
-            const adaptiveThreshold = avgBrightness < 128 ? avgBrightness * 0.8 : avgBrightness * 0.9;
-            
-            // Segundo paso: Aplicar el umbral adaptativo
-            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-                const gray = pixelValues[j];
-                
-                // Aplicar umbral para crear imagen binaria
-                const val = gray > adaptiveThreshold ? 255 : 0;
-                
-                data[i] = val;     // R
-                data[i + 1] = val; // G
-                data[i + 2] = val; // B
-            }
-            
-            ctx.putImageData(imageData, 0, 0);
-            
-            // Aumentar tamaño y mejorar contraste
-            applyContrastEnhancement(canvas);
-        }
-        
-        // Función para mejorar el contraste y escalar la imagen
-        function applyContrastEnhancement(canvas) {
-            // Aumentar tamaño del canvas para mejor reconocimiento
-            const scaleFactor = 2.5; // Aumentado para mayor detalle
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = canvas.width * scaleFactor;
-            tempCanvas.height = canvas.height * scaleFactor;
-            
-            // Dibujar la imagen escalada sin suavizado para preservar bordes nítidos
-            tempCtx.imageSmoothingEnabled = false;
-            tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
-            
-            // Copiar de vuelta al canvas original
-            canvas.width = tempCanvas.width;
-            canvas.height = tempCanvas.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(tempCanvas, 0, 0);
-            
-            // Opcional: realizar ajustes adicionales de contraste o nitidez
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            
-            // Aumento adicional de contraste para mejorar el reconocimiento
-            for (let i = 0; i < data.length; i += 4) {
-                // Si el pixel ya es blanco o negro, dejarlo así
-                if (data[i] === 255 || data[i] === 0) continue;
-                
-                // Para valores grises, aumentar el contraste
-                const val = data[i] < 128 ? 0 : 255;
-                data[i] = val;     // R
-                data[i + 1] = val; // G
-                data[i + 2] = val; // B
-            }
-            
-            ctx.putImageData(imageData, 0, 0);
-            
-            // Guardar la imagen procesada para depuración si es necesario
-            if (window.debugMode) {
-                window.processedImage = canvas.toDataURL('image/png');
-                console.log("Imagen procesada disponible en window.processedImage");
             }
         }
         
@@ -876,7 +895,7 @@
             const captureId = resultText.getAttribute('data-capture-id');
             if (!captureId) return;
             
-            const id = parseInt(captureId);
+            const id = parseInt(captureId, 10);
             const capture = captures.find(c => c.id === id);
             if (!capture) return;
             
@@ -1007,6 +1026,29 @@
             });
         }
         
+        // Editar un elemento específico del historial
+        function editHistoryItem(id) {
+            // Convertir a número por si acaso
+            id = parseInt(id, 10);
+            
+            const capture = captures.find(c => c.id === id);
+            if (!capture) return;
+            
+            // Establecer el ID de edición actual
+            currentEditingId = id;
+            
+            // Establecer valores para edición
+            referenceNumber.value = capture.number || '';
+            
+            // Mostrar el resultado para edición
+            showResult(capture.hexCode, capture.number, id);
+            generateQRCode(capture.hexCode);
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
+            
+            // Iniciar edición inmediatamente
+            startEditCapture();
+        }
+        
         // Eliminar un elemento específico del historial
         function removeHistoryItem(id) {
             if (confirm('¿Está seguro que desea eliminar esta entrada del historial?')) {
@@ -1033,20 +1075,22 @@
             }
         }
         
-        // Copiar texto al portapapeles
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                updateStatus('Copiado al portapapeles', 'success');
-            }, (err) => {
-                console.error('Error al copiar:', err);
-                updateStatus('Error al copiar al portapapeles', 'error');
-            });
+        // Eliminar historial de capturas
+        function clearHistory() {
+            if (confirm('¿Está seguro de que desea eliminar todo el historial de capturas?')) {
+                captures = [];
+                saveCapturesToStorage();
+                updateCaptureHistory();
+                downloadBtn.disabled = true;
+                clearHistoryBtn.disabled = true;
+                updateStatus('Historial eliminado', 'info');
+            }
         }
         
         // Generar QR para un elemento del historial
         function generateQRCodeForItem(hexCode, captureId) {
             const capture = captureId ? 
-                captures.find(c => c.id === captureId) : 
+                captures.find(c => c.id === parseInt(captureId, 10)) : 
                 captures.find(c => c.hexCode === hexCode);
             
             if (capture) {
@@ -1058,6 +1102,16 @@
                 generateQRCode(hexCode);
                 resultContainer.scrollIntoView({ behavior: 'smooth' });
             }
+        }
+        
+        // Copiar texto al portapapeles
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                updateStatus('Copiado al portapapeles', 'success');
+            }, (err) => {
+                console.error('Error al copiar:', err);
+                updateStatus('Error al copiar al portapapeles', 'error');
+            });
         }
         
         // Descargar capturas como archivo de texto
@@ -1088,18 +1142,6 @@
             updateStatus('Archivo descargado', 'success');
         }
         
-        // Eliminar historial de capturas
-        function clearHistory() {
-            if (confirm('¿Está seguro de que desea eliminar todo el historial de capturas?')) {
-                captures = [];
-                saveCapturesToStorage();
-                updateCaptureHistory();
-                downloadBtn.disabled = true;
-                clearHistoryBtn.disabled = true;
-                updateStatus('Historial eliminado', 'info');
-            }
-        }
-        
         // Guardar capturas en localStorage
         function saveCapturesToStorage() {
             localStorage.setItem('hexCaptures', JSON.stringify(captures));
@@ -1125,6 +1167,8 @@
         // Exponer funciones globalmente para ser accesibles desde HTML
         window.copyToClipboard = copyToClipboard;
         window.generateQRCodeForItem = generateQRCodeForItem;
+        window.removeHistoryItem = removeHistoryItem;
+        window.editHistoryItem = editHistoryItem;
     </script>
 </body>
 </html>

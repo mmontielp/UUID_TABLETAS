@@ -1,21 +1,47 @@
 {
-    "name": "UUID Scanner a QR",
-    "short_name": "UUID Scan",
-    "description": "Escanea UUIDs con OCR y genera códigos QR",
+    "name": "Hex Scanner - Windows",
+    "short_name": "HexScan",
+    "description": "Captura cadenas hexadecimales desde webcam con OCR avanzado",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#2196F3",
+    "orientation": "any",
     "icons": [
-        {
-            "src": "icons/icon-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png"
+      {
+        "src": "icon-192x192.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "icon-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable"
+      }
+    ],
+    "screenshots": [
+      {
+        "src": "screenshot.png",
+        "sizes": "1280x720",
+        "type": "image/png",
+        "platform": "windows"
+      }
+    ],
+    "file_handlers": [
+      {
+        "action": "./index.html",
+        "accept": {
+          "text/*": [".txt"]
         }
+      }
+    ],
+    "shortcuts": [
+      {
+        "name": "Nuevo escaneo",
+        "url": "./index.html?action=scan",
+        "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+      }
     ]
-}
+  }

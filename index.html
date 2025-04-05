@@ -203,7 +203,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 190px; /* Aproximadamente 5cm en la mayoría de dispositivos */
-            height: 76px; /* Aproximadamente 2cm en la mayoría de dispositivos */
+            height: 95px; /* Aproximadamente 2.5cm en la mayoría de dispositivos - aumentado */
             border: 2px solid #2196F3;
             border-radius: 3px;
             box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
@@ -480,7 +480,7 @@
             // directamente a cada elemento del historial en renderHistory()
         }
         
-        // Procesar imagen desde archivo (galería)
+        // Función para procesar imágenes seleccionadas manualmente desde la galería
         function processImageFromFile(file) {
             loadingOverlay.classList.add('visible');
             
@@ -489,60 +489,102 @@
                 const imageDataUrl = e.target.result;
                 
                 try {
-                    // Pre-procesar la imagen para mejorar el OCR
-                    const enhancedImageUrl = await enhanceImageForOCR(imageDataUrl);
-                    
-                    // Configurar Tesseract
+                    // Crear un trabajador de Tesseract
                     const worker = await Tesseract.createWorker({
                         logger: m => console.log(m)
                     });
                     
+                    // Cargar el modelo
                     await worker.loadLanguage('eng');
                     await worker.initialize('eng');
                     
-                    // Configuración optimizada para UUIDs
+                    // Primera pasada: configuración estándar
                     await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789abcdefABCDEF',
+                        tessedit_char_whitelist: '0123456789ABCDEFabcdef',
                         tessedit_pageseg_mode: '7',
-                        tessedit_ocr_engine_mode: '2',
-                        preserve_interword_spaces: '0',
+                        preserve_interword_spaces: '0'
                     });
                     
-                    // Procesar la imagen
-                    const { data } = await worker.recognize(enhancedImageUrl);
+                    const result1 = await worker.recognize(imageDataUrl);
+                    console.log("Reconocimiento (imagen de galería):", result1.data.text);
+                    
+                    // Segunda pasada con diferente configuración
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789ABCDEFabcdef',
+                        tessedit_pageseg_mode: '6',
+                        scale: 2.0
+                    });
+                    
+                    const result2 = await worker.recognize(imageDataUrl);
+                    console.log("Segundo reconocimiento (imagen de galería):", result2.data.text);
+                    
                     await worker.terminate();
                     
-                    // Buscar UUIDs
-                    const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
-                    const matches = data.text.match(uuidPattern);
+                    // Mismo proceso de análisis de candidatos que en processImage
+                    const candidates = [];
                     
-                    // Limpiar texto (eliminar espacios y caracteres no deseados)
-                    const cleanText = data.text.replace(/[^0-9a-fA-F]/g, '');
+                    // Extraer posibles UUID de cada resultado
+                    [result1.data.text, result2.data.text].forEach(text => {
+                        // Limpieza básica
+                        const cleanText = text.replace(/[^0-9a-fA-F]/gi, '');
+                        
+                        // Por longitud
+                        if (cleanText.length >= 16 && cleanText.length <= 24) {
+                            candidates.push(cleanText.substring(0, Math.min(cleanText.length, 24)));
+                        }
+                        
+                        // Por patrón
+                        const uuidPattern = /[0-9a-fA-F]{16,24}/gi;
+                        const matches = text.match(uuidPattern);
+                        if (matches && matches.length > 0) {
+                            candidates.push(matches[0]);
+                        }
+                    });
                     
-                    // Verificar si el texto limpio tiene entre 16 y 24 caracteres
-                    if (cleanText.length >= 16 && cleanText.length <= 24) {
-                        const uuid = cleanText.slice(0, Math.min(cleanText.length, 24));
-                        showResult(uuid);
+                    // Si no tenemos candidatos, extraer caracteres hexadecimales
+                    if (candidates.length === 0) {
+                        const allText = result1.data.text + " " + result2.data.text;
+                        let hexOnly = "";
+                        for (let i = 0; i < allText.length; i++) {
+                            if (/[0-9a-fA-F]/i.test(allText[i])) {
+                                hexOnly += allText[i];
+                            }
+                        }
                         
-                        // Guardar en historial
-                        scanHistory.unshift({
-                            uuid: uuid,
-                            timestamp: new Date().toISOString()
-                        });
-                        saveHistory();
-                        renderHistory();
-                    } else if (matches && matches.length > 0) {
-                        showResult(matches[0]);
+                        if (hexOnly.length >= 16) {
+                            candidates.push(hexOnly.substring(0, Math.min(hexOnly.length, 24)));
+                        }
+                    }
+                    
+                    // ¿Encontramos algún candidato?
+                    if (candidates.length > 0) {
+                        console.log("Candidatos de UUID encontrados (galería):", candidates);
                         
-                        // Guardar en historial
-                        scanHistory.unshift({
-                            uuid: matches[0],
-                            timestamp: new Date().toISOString()
-                        });
-                        saveHistory();
-                        renderHistory();
+                        // Usar el candidato más largo que sea válido
+                        const validCandidates = candidates.filter(c => 
+                            c.length >= 16 && /^[0-9a-fA-F]+$/i.test(c));
+                        
+                        if (validCandidates.length > 0) {
+                            // Ordenar por longitud
+                            validCandidates.sort((a, b) => b.length - a.length);
+                            
+                            const bestCandidate = validCandidates[0];
+                            console.log("Mejor candidato seleccionado (galería):", bestCandidate);
+                            
+                            showResult(bestCandidate);
+                            
+                            // Guardar en historial
+                            scanHistory.unshift({
+                                uuid: bestCandidate,
+                                timestamp: new Date().toISOString()
+                            });
+                            saveHistory();
+                            renderHistory();
+                        } else {
+                            alert('No se pudo reconocer un UUID válido. Intente con otra imagen.');
+                        }
                     } else {
-                        alert('No se encontró ningún UUID válido en la imagen');
+                        alert('No se encontró ningún UUID en la imagen seleccionada.');
                     }
                     
                 } catch (error) {
@@ -912,10 +954,33 @@
         
         // Mostrar resultado
         function showResult(uuid) {
+            // Si el UUID tiene menos de 16 caracteres, mostrar un error
+            if (uuid.length < 16) {
+                alert('El UUID detectado es demasiado corto. Intente capturar la imagen nuevamente.');
+                return;
+            }
+            
+            // Asegurarse de que sea hexadecimal
+            if (!/^[0-9a-fA-F]+$/.test(uuid)) {
+                alert('El UUID contiene caracteres no válidos. Intente capturar la imagen nuevamente.');
+                return;
+            }
+            
+            // Limitar a 24 caracteres si es más largo
+            if (uuid.length > 24) {
+                uuid = uuid.substring(0, 24);
+            }
+            
+            // Actualizar estado
             currentUuid = uuid;
+            
+            // Mostrar UUID en la interfaz y hacer visible el contenedor de resultados
             uuidDisplay.textContent = uuid;
             generateQRCode(uuid);
             resultContainer.classList.add('visible');
+            
+            // Hacer scroll hacia el resultado
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
         }
         
         // Generar código QR
@@ -960,6 +1025,5 @@
     </script>
 </body>
 </html>
-
 
 

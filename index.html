@@ -109,23 +109,14 @@
         let canvas = null;
         let scanning = false;
         let stream = null;
-        let captureAttempts = 0;
-        const MAX_CAPTURE_ATTEMPTS = 10;
-
-        // Configuración optimizada para OCR
-        const OCR_CONFIG = {
-            tessedit_char_whitelist: '0123456789abcdef',
-            tessedit_char_blacklist: 'gGiIlLoO',
-            tessjs_create_osd: '0',
-            tessedit_pageseg_mode: '7',
-            tessedit_ocr_engine_mode: '3'
-        };
 
         // Inicializar la aplicación
         async function init() {
             try {
                 // Preparar canvas
                 canvas = document.createElement('canvas');
+                canvas.width = 320;  // Resolución más baja
+                canvas.height = 240;
                 
                 // Iniciar cámara
                 stream = await navigator.mediaDevices.getUserMedia({
@@ -153,43 +144,21 @@
             if (!scanning) return;
 
             try {
-                // Preparar canvas
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
                 
-                // Capturar frame
+                // Capturar frame con tamaño reducido
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Recortar región de interés
-                const videoRect = video.getBoundingClientRect();
-                const overlayRect = document.querySelector('.scanner-overlay').getBoundingClientRect();
-                
-                const scaleX = canvas.width / videoRect.width;
-                const scaleY = canvas.height / videoRect.height;
-                
-                const cropX = Math.max(0, (overlayRect.left - videoRect.left) * scaleX);
-                const cropY = Math.max(0, (overlayRect.top - videoRect.top) * scaleY);
-                const cropWidth = Math.min(overlayRect.width * scaleX, canvas.width - cropX);
-                const cropHeight = Math.min(overlayRect.height * scaleY, canvas.height - cropY);
-                
-                // Crear canvas temporal para OCR
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = cropWidth;
-                tempCanvas.height = cropHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(
-                    canvas, 
-                    cropX, cropY, cropWidth, cropHeight, 
-                    0, 0, cropWidth, cropHeight
-                );
                 
                 // Realizar OCR
                 statusDiv.textContent = 'Procesando...';
                 const result = await Tesseract.recognize(
-                    tempCanvas, 
+                    canvas, 
                     'eng', 
-                    OCR_CONFIG
+                    {
+                        tessedit_char_whitelist: '0123456789abcdef',
+                        tessjs_create_osd: '0',
+                        tessedit_pageseg_mode: '7'
+                    }
                 );
                 
                 // Limpiar y procesar texto
@@ -197,15 +166,17 @@
                     .replace(/[\s\n\r]/g, '')
                     .replace(/[^0-9a-f]/g, '');
                 
-                // Procesar caracteres confusos
-                const characterMap = {
-                    'g': '9', 'i': '1', 'l': '1', 'o': '0', 
-                    'z': '2', 's': '5', 't': 'f', 'b': '6'
+                // Mapeo rápido de caracteres confusos
+                const charMap = {
+                    'g': '9', 'i': '1', 'l': '1', 
+                    'o': '0', 'z': '2', 's': '5', 
+                    't': 'f', 'b': '6'
                 };
                 
-                recognizedText = recognizedText.split('').map(char => 
-                    characterMap[char] || char
-                ).join('');
+                recognizedText = recognizedText
+                    .split('')
+                    .map(char => charMap[char] || char)
+                    .join('');
                 
                 // Validar y procesar cadena hexadecimal
                 if (recognizedText.length >= 16) {
@@ -228,21 +199,7 @@
                     
                     // Detener escaneo
                     stopScanning();
-                    return;
                 }
-                
-                // Incrementar intentos de captura
-                captureAttempts++;
-                
-                // Detener si se superan los intentos máximos
-                if (captureAttempts >= MAX_CAPTURE_ATTEMPTS) {
-                    statusDiv.textContent = 'No se pudo capturar el código';
-                    stopScanning();
-                    return;
-                }
-                
-                // Continuar procesando
-                requestAnimationFrame(processFrame);
             } catch (error) {
                 console.error('Error en procesamiento:', error);
                 statusDiv.textContent = 'Error de procesamiento';
@@ -253,9 +210,10 @@
         // Iniciar escaneo
         function startScanning() {
             scanning = true;
-            captureAttempts = 0;
             statusDiv.textContent = 'Escaneando...';
             captureButton.disabled = true;
+            
+            // Comenzar captura inmediata
             requestAnimationFrame(processFrame);
         }
 
@@ -266,10 +224,8 @@
             captureButton.disabled = false;
         }
 
-        // Configurar evento de captura
+        // Configurar eventos
         captureButton.addEventListener('click', startScanning);
-
-        // Iniciar cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>

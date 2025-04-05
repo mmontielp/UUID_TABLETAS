@@ -50,7 +50,7 @@
             position: relative;
             width: 100%;
             max-width: 500px;
-            height: 300px;
+            height: 220px;
             margin-bottom: 1rem;
             overflow: hidden;
             background-color: #000;
@@ -152,7 +152,16 @@
         
         @media (max-width: 600px) {
             .camera-container {
-                height: 40vh;
+                height: 30vh;
+            }
+            
+            #qrCode {
+                max-height: 200px;
+            }
+            
+            #qrCode img {
+                max-width: 160px;
+                max-height: 160px;
             }
         }
     </style>
@@ -294,9 +303,15 @@
             statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
         }
         
+        // Variable para controlar si se está procesando una imagen
+        let isProcessing = false;
+        
         // Capturar y procesar la imagen
         async function captureAndProcess() {
-            if (!scanning) return;
+            if (!scanning || isProcessing) return;
+            
+            // Marcar que estamos procesando
+            isProcessing = true;
             
             try {
                 // Ajustar canvas al tamaño del video
@@ -371,13 +386,13 @@
                         hexInput.value = recognizedText;
                         validateHexInput();
                         
-                        // Detener el escaneo después de un éxito
-                        stopScanning();
+                        // Detener el escaneo inmediatamente para evitar más capturas mientras se procesa
+                        scanning = false;
                         
                         // Mostrar notificación de éxito
                         showNotification('¡Cadena hexadecimal detectada con éxito!');
                         
-                        // Generar QR automáticamente
+                        // Generar QR automáticamente - esto también detiene la captura
                         generateQR();
                         return;
                     } else if (recognizedText.length > 16) {
@@ -392,18 +407,24 @@
                     }
                 }
                 
+                // Marcar que hemos terminado de procesar
+                isProcessing = false;
+                
                 // Continuar escaneando si no se detuvo
                 if (scanning) {
-                    // Esperar un breve momento antes de la siguiente captura
-                    setTimeout(captureAndProcess, 500);
+                    // Capturar inmediatamente el siguiente frame para mayor velocidad
+                    requestAnimationFrame(captureAndProcess);
                 }
             } catch (error) {
                 console.error('Error al procesar la imagen:', error);
                 statusDiv.textContent = 'Error al procesar la imagen: ' + error.message;
                 
+                // Marcar que hemos terminado de procesar incluso con error
+                isProcessing = false;
+                
                 // Reintentar si todavía está en modo escaneo
                 if (scanning) {
-                    setTimeout(captureAndProcess, 1000);
+                    setTimeout(captureAndProcess, 300);
                 }
             }
         }
@@ -429,14 +450,19 @@
         function generateQR() {
             const value = hexInput.value.trim();
             
+            // Detener el proceso de captura si está activo
+            if (scanning) {
+                stopScanning();
+            }
+            
             // Vaciar el contenedor de QR
             qrCodeDiv.innerHTML = '';
             
-            // Crear instancia de QRCode
+            // Crear instancia de QRCode con tamaño reducido
             qrInstance = new QRCode(qrCodeDiv, {
                 text: value,
-                width: 200,
-                height: 200,
+                width: 160,
+                height: 160,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H

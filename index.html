@@ -177,12 +177,12 @@
             <input type="text" id="hexInput" placeholder="Cadena hexadecimal (16 caracteres)" maxlength="16" pattern="[0-9a-f]{16}">
             <div id="hexError" class="hex-error hidden">La cadena debe contener exactamente 16 caracteres hexadecimales (0-9, a-f).</div>
             
-            <div id="qrCode"></div>
-            
             <div class="control-buttons">
-                <button id="scanButton">Escanear</button>
+                <button id="scanButton">Capturar</button>
                 <button id="generateButton" disabled>Generar QR</button>
             </div>
+            
+            <div id="qrCode"></div>
         </div>
     </main>
 
@@ -276,7 +276,7 @@
         function startScanning() {
             scanning = true;
             scanButton.textContent = 'Detener';
-            statusDiv.textContent = 'Escaneando...';
+            statusDiv.textContent = 'Capturando...';
             
             // Crear canvas para capturar la imagen si no existe
             if (!canvas) {
@@ -290,8 +290,8 @@
         // Detener el proceso de escaneo
         function stopScanning() {
             scanning = false;
-            scanButton.textContent = 'Escanear';
-            statusDiv.textContent = 'Cámara activa. Pulse "Escanear" para capturar.';
+            scanButton.textContent = 'Capturar';
+            statusDiv.textContent = 'Cámara activa. Pulse "Capturar" para comenzar.';
         }
         
         // Capturar y procesar la imagen
@@ -331,8 +331,16 @@
                 // Procesar la imagen con Tesseract OCR
                 statusDiv.textContent = 'Procesando imagen...';
                 
+                // Configuración adicional para mejorar el reconocimiento de caracteres problemáticos
                 const result = await Tesseract.recognize(tempCanvas, 'eng', {
-                    tessedit_char_whitelist: '0123456789abcdef'
+                    tessedit_char_whitelist: '0123456789abcdef',
+                    tessjs_create_hocr: '0',
+                    tessjs_create_tsv: '0',
+                    // Mejorar el reconocimiento de caracteres problemáticos
+                    tessedit_char_blacklist: 'gGiIlLoO',  // Evitar confusiones comunes
+                    tessedit_enable_dict_correction: '0', // Evitar correcciones de diccionario
+                    tessedit_pageseg_mode: '7',           // Tratarlo como una línea de texto
+                    tessjs_image_pre_multiplier: '2'      // Aumentar resolución para mejor reconocimiento
                 });
                 
                 // Extraer el texto reconocido y limpiarlo
@@ -340,6 +348,16 @@
                 
                 // Eliminar espacios y saltos de línea
                 recognizedText = recognizedText.replace(/[\s\n\r]/g, '');
+                
+                // Correcciones específicas para caracteres problemáticos
+                recognizedText = recognizedText
+                    .replace(/g/g, '9')  // Corregir 'g' confundida con '9'
+                    .replace(/i/g, '1')  // Corregir 'i' confundida con '1'
+                    .replace(/l/g, '1')  // Corregir 'l' confundida con '1'
+                    .replace(/o/g, '0')  // Corregir 'o' confundida con '0'
+                    .replace(/z/g, '2')  // Corregir 'z' confundida con '2'
+                    .replace(/s/g, '5')  // Corregir 's' confundida con '5'
+                    .replace(/t/g, 'f'); // Corregir 't' confundida con 'f'
                 
                 // Filtrar solo caracteres hexadecimales
                 recognizedText = recognizedText.replace(/[^0-9a-f]/g, '');

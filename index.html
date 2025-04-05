@@ -339,7 +339,6 @@
         </div>
     </div>
     
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.3/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
@@ -979,7 +978,7 @@
                             📋
                             <span class="tooltiptext">Copiar</span>
                         </button>
-                        <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}')">
+                        <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}', ${capture.id})">
                             🔄
                             <span class="tooltiptext">Generar QR</span>
                         </button>
@@ -998,24 +997,30 @@
             });
         }
         
-        // Editar un elemento específico del historial
-        function editHistoryItem(id) {
-            const capture = captures.find(c => c.id === id);
-            if (!capture) return;
-            
-            // Establecer el ID de edición actual
-            currentEditingId = id;
-            
-            // Establecer valores para edición
-            referenceNumber.value = capture.number || '';
-            
-            // Mostrar el resultado para edición
-            showResult(capture.hexCode, capture.number, id);
-            generateQRCode(capture.hexCode);
-            resultContainer.scrollIntoView({ behavior: 'smooth' });
-            
-            // Iniciar edición inmediatamente
-            startEditCapture();
+        // Eliminar un elemento específico del historial
+        function removeHistoryItem(id) {
+            if (confirm('¿Está seguro que desea eliminar esta entrada del historial?')) {
+                // Convertir a número por si acaso
+                id = parseInt(id, 10);
+                
+                // Filtrar para quitar el elemento con ese ID
+                captures = captures.filter(capture => capture.id !== id);
+                
+                saveCapturesToStorage();
+                updateCaptureHistory();
+                
+                // Actualizar estado de los botones
+                downloadBtn.disabled = captures.length === 0;
+                clearHistoryBtn.disabled = captures.length === 0;
+                
+                // Si estábamos viendo este elemento, ocultarlo
+                const currentViewingId = resultText.getAttribute('data-capture-id');
+                if (currentViewingId && parseInt(currentViewingId, 10) === id) {
+                    resultContainer.classList.add('hidden');
+                }
+                
+                updateStatus('Entrada eliminada del historial', 'info');
+            }
         }
         
         // Copiar texto al portapapeles

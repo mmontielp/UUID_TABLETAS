@@ -180,6 +180,18 @@
             text-overflow: ellipsis;
             flex-grow: 1;
             max-width: calc(100% - 120px);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .history-thumbnail {
+            width: 36px;
+            height: 36px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            cursor: pointer;
         }
         
         .history-actions {
@@ -296,6 +308,68 @@
             gap: 10px;
         }
         
+        /* Estilo para el modal de imagen ampliada */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            overflow: auto;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            position: relative;
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+        
+        .close-modal {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        
+        .close-modal:hover {
+            color: #333;
+        }
+        
+        .modal-image {
+            max-width: 100%;
+            max-height: 80vh;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .image-edit-container {
+            display: flex;
+            margin-top: 15px;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .capture-preview {
+            max-width: 100%;
+            max-height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
@@ -355,6 +429,17 @@
         </div>
     </div>
     
+    <!-- Modal para mostrar imagen ampliada -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <img id="modalImage" class="modal-image">
+            <div class="image-edit-container">
+                <button id="editFromModalBtn" class="action-btn">Editar esta captura</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.3/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
@@ -376,6 +461,10 @@
         const resultText = document.getElementById('resultText');
         const qrcodeContainer = document.getElementById('qrcode');
         const statusElement = document.getElementById('status');
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const closeModal = document.querySelector('.close-modal');
+        const editFromModalBtn = document.getElementById('editFromModalBtn');
         
         // Expresión regular para validar código hexadecimal de 16 caracteres (letras minúsculas)
         const hexRegex = /^[0-9a-f]{16}$/;
@@ -416,15 +505,15 @@
             
             workerPromise.then(async worker => {
                 try {
-                    // Configurar para reconocer con alta precisión caracteres hexadecimales
+                    // Configurar para reconocer con alta precisión caracteres hexadecimales minúsculas
                     await worker.loadLanguage('eng');
                     await worker.initialize('eng');
                     
                     // Configuración optimizada para reconocimiento de códigos hexadecimales
                     await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789abcdefABCDEF',
+                        tessedit_char_whitelist: '0123456789abcdef', // Solo minúsculas y números
                         tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                        tessedit_ocr_engine_mode: 1, // Cambiado a Neural net LSTM engine
+                        tessedit_ocr_engine_mode: 1, // LSTM (Neural network) engine
                         tessjs_create_hocr: '0',
                         tessjs_create_tsv: '0'
                     });
@@ -515,6 +604,25 @@
             if (editCaptureBtn) {
                 editCaptureBtn.addEventListener('click', startEditCapture);
             }
+            
+            // Eventos para el modal de imagen
+            closeModal.addEventListener('click', () => {
+                imageModal.style.display = 'none';
+            });
+            
+            window.addEventListener('click', (e) => {
+                if (e.target === imageModal) {
+                    imageModal.style.display = 'none';
+                }
+            });
+            
+            editFromModalBtn.addEventListener('click', () => {
+                const captureId = modalImage.getAttribute('data-id');
+                if (captureId) {
+                    editHistoryItem(parseInt(captureId, 10));
+                    imageModal.style.display = 'none';
+                }
+            });
         }
         
         // Ajustar el zoom de la cámara manualmente
@@ -594,19 +702,11 @@
                     0, 0, canvas.width, canvas.height
                 );
                 
-                // Modo debug - mostrar la imagen original capturada
-                if (window.debugMode) {
-                    const originalImage = canvas.toDataURL('image/png');
-                    const debugImg = document.createElement('img');
-                    debugImg.src = originalImage;
-                    debugImg.style.maxWidth = '100%';
-                    debugImg.style.border = '1px solid red';
-                    debugImg.title = 'Imagen original capturada';
-                    document.body.appendChild(debugImg);
-                }
+                // Guardar la imagen original antes del procesamiento OCR
+                const originalImage = canvas.toDataURL('image/png');
                 
                 // Procesar la imagen con OCR
-                processWithOCR(canvas).finally(() => {
+                processWithOCR(canvas, originalImage).finally(() => {
                     // Restablecer el estado de procesamiento
                     isProcessing = false;
                     captureBtn.disabled = false;
@@ -624,7 +724,7 @@
             const ctx = canvas.getContext('2d');
             
             // Primer paso: Aumentar el tamaño para mejorar la resolución
-            const scaleFactor = 4.0; // Aumentado para mayor detalle
+            const scaleFactor = 4.0; // Mayor escala para mejor detalle
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = canvas.width * scaleFactor;
@@ -646,13 +746,6 @@
             if (window.debugMode) {
                 window.processedImage = canvas.toDataURL('image/png');
                 console.log("Imagen procesada disponible en window.processedImage");
-                
-                // Mostrar la imagen procesada para depuración
-                const debugImg = document.createElement('img');
-                debugImg.src = window.processedImage;
-                debugImg.style.maxWidth = '100%';
-                debugImg.style.border = '1px solid green';
-                document.body.appendChild(debugImg);
             }
         }
         
@@ -727,7 +820,7 @@
         }
         
         // Procesar imagen con OCR
-        async function processWithOCR(canvas) {
+        async function processWithOCR(canvas, originalImage) {
             updateStatus('Procesando imagen con OCR...', 'info');
             
             try {
@@ -743,9 +836,9 @@
                 
                 // Configuración optimizada para reconocimiento preciso de hexadecimal
                 await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789abcdefABCDEF', // Permitir mayúsculas y minúsculas
+                    tessedit_char_whitelist: '0123456789abcdef', // Solo caracteres hex minúsculas
                     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                    tessedit_ocr_engine_mode: 2, // Modo Legacy para mejor precisión
+                    tessedit_ocr_engine_mode: 1, // LSTM engine
                 });
                 
                 // Realizar OCR en la imagen
@@ -755,30 +848,31 @@
                 console.log("Texto OCR original:", data.text);
                 
                 // Limpiar el texto reconocido - eliminar espacios y caracteres no hexadecimales
-                let recognizedText = data.text.trim().replace(/[^0-9a-fA-F]/gi, '').toLowerCase();
+                let recognizedText = data.text.trim().replace(/[^0-9a-f]/gi, '').toLowerCase();
                 
                 console.log("Texto procesado:", recognizedText);
                 
-                // Si tenemos exactamente 16 caracteres hexadecimales
-                if (recognizedText.length === 16 && /^[0-9a-f]{16}$/.test(recognizedText)) {
-                    handleValidHexCode(recognizedText);
-                    return;
+                // Aplicar correcciones específicas para mejorar la detección
+                function postProcessHexString(text) {
+                    // Reemplazos específicos para corregir errores comunes
+                    let processed = text
+                        .replace(/o/g, '0') // 'o' -> '0'
+                        .replace(/l/g, '1') // 'l' -> '1'
+                        .replace(/i/g, '1') // 'i' -> '1'
+                        .replace(/z/g, '2') // 'z' -> '2'
+                        .replace(/s/g, '5') // 's' -> '5'
+                        .replace(/t/g, '7') // 't' -> '7'
+                        .replace(/g/g, '9'); // 'g' -> '9'
+                        
+                    // Eliminar cualquier carácter que no sea hexadecimal
+                    processed = processed.replace(/[^0-9a-f]/g, '');
+                    
+                    return processed;
                 }
                 
-                // Si tenemos más de 16 caracteres, tomar los primeros 16
-                if (recognizedText.length > 16) {
-                    const hexSubstring = recognizedText.substring(0, 16);
-                    console.log("Usando los primeros 16 caracteres:", hexSubstring);
-                    handleValidHexCode(hexSubstring);
-                    return;
-                }
-                
-                // Si tenemos menos de 16 caracteres, pero más de 14, intentar completar
-                if (recognizedText.length >= 14 && recognizedText.length < 16) {
-                    // Rellenar con ceros hasta 16 caracteres
-                    const paddedHex = recognizedText.padEnd(16, '0');
-                    console.log("Texto rellenado a 16 caracteres:", paddedHex);
-                    handleValidHexCode(paddedHex);
+                // La cadena siempre tiene 16 caracteres exactamente
+                if (recognizedText.length === 16 && hexRegex.test(recognizedText)) {
+                    handleValidHexCode(recognizedText, originalImage);
                     return;
                 }
                 
@@ -792,7 +886,7 @@
         }
         
         // Manejar cadena hexadecimal válida
-        function handleValidHexCode(hexCode) {
+        function handleValidHexCode(hexCode, imageData) {
             const number = referenceNumber.value.trim();
             const timestamp = new Date().toISOString();
             
@@ -800,13 +894,18 @@
                 id: currentEditingId || Date.now(),
                 number: number,
                 hexCode: hexCode,
-                timestamp: timestamp
+                timestamp: timestamp,
+                imageData: imageData // Guardar la imagen capturada
             };
             
             if (currentEditingId) {
                 // Estamos editando una captura existente
                 const index = captures.findIndex(c => c.id === currentEditingId);
                 if (index !== -1) {
+                    // Preservar la imagen original si no hay una nueva
+                    if (!imageData && captures[index].imageData) {
+                        capture.imageData = captures[index].imageData;
+                    }
                     captures[index] = capture;
                     updateStatus(`Captura #${currentEditingId} actualizada`, 'success');
                 } else {
@@ -909,25 +1008,38 @@
             currentEditingId = id;
             
             // Crear contenido de edición
-            resultText.innerHTML = `
+            let formContent = `
                 <div class="edit-form">
                     <div class="form-group">
                         <label for="editHexCode">Código Hexadecimal:</label>
                         <input type="text" id="editHexCode" value="${capture.hexCode}" 
                                style="font-family: monospace; width: 100%;" 
-                               pattern="[0-9a-fA-F]{16}" maxlength="16" required>
+                               pattern="[0-9a-f]{16}" maxlength="16" required>
                     </div>
                     <div class="form-group">
                         <label for="editNumber">Máquina:</label>
                         <input type="number" id="editNumber" value="${capture.number || ''}" 
                                style="width: 100px; text-align: center;" min="1" max="999">
-                    </div>
+                    </div>`;
+            
+            // Añadir imagen de vista previa si está disponible
+            if (capture.imageData) {
+                formContent += `
+                    <div class="form-group">
+                        <img src="${capture.imageData}" alt="Imagen de captura" class="capture-preview">
+                    </div>`;
+            }
+            
+            // Botones de acción
+            formContent += `
                     <div class="edit-actions" style="margin-top: 15px;">
                         <button id="saveEditBtn" class="action-btn">Guardar</button>
                         <button id="cancelEditBtn" class="action-btn danger">Cancelar</button>
                     </div>
                 </div>
             `;
+            
+            resultText.innerHTML = formContent;
             
             // Ocultar el botón de edición mientras estamos editando
             const editBtn = document.getElementById('editCaptureBtn');
@@ -953,7 +1065,11 @@
             }
             
             // Actualizar captura
-            handleValidHexCode(hexCode);
+            const number = numberInput.value.trim();
+            const existingCapture = captures.find(c => c.id === currentEditingId);
+            
+            // Actualizar manteniendo la imagen original
+            handleValidHexCode(hexCode, existingCapture ? existingCapture.imageData : null);
             
             // Resetear el formulario de edición
             const editBtn = document.getElementById('editCaptureBtn');
@@ -1006,8 +1122,17 @@
                 
                 const textDisplay = `${capture.number ? capture.number : 'Sin número'}  ${capture.hexCode}`;
                 
-                item.innerHTML = `
-                    <div class="history-content" title="${textDisplay}">${textDisplay}</div>
+                // Crear contenido del historial con miniatura
+                let contentHTML = `<div class="history-content" title="${textDisplay}">`;
+                
+                // Añadir miniatura de imagen si está disponible
+                if (capture.imageData) {
+                    contentHTML += `<img src="${capture.imageData}" class="history-thumbnail" onclick="showImageModal('${capture.id}')">`;
+                }
+                
+                contentHTML += `<span>${textDisplay}</span></div>`;
+                
+                item.innerHTML = contentHTML + `
                     <div class="history-actions">
                         <button class="tooltip action-btn" onclick="copyToClipboard('${textDisplay}')">
                             📋
@@ -1030,6 +1155,17 @@
                 
                 captureHistory.appendChild(item);
             });
+        }
+        
+        // Mostrar imagen en modal
+        function showImageModal(id) {
+            id = parseInt(id, 10);
+            const capture = captures.find(c => c.id === id);
+            if (!capture || !capture.imageData) return;
+            
+            modalImage.src = capture.imageData;
+            modalImage.setAttribute('data-id', id);
+            imageModal.style.display = 'flex';
         }
         
         // Editar un elemento específico del historial
@@ -1150,7 +1286,20 @@
         
         // Guardar capturas en localStorage
         function saveCapturesToStorage() {
-            localStorage.setItem('hexCaptures', JSON.stringify(captures));
+            // Almacenar capturas localmente
+            try {
+                localStorage.setItem('hexCaptures', JSON.stringify(captures));
+            } catch (e) {
+                // Si ocurre un error (posiblemente por tamaño excesivo), intentar sin imágenes
+                if (e.name === 'QuotaExceededError') {
+                    console.warn('Espacio de localStorage excedido, guardando sin imágenes');
+                    const capturesWithoutImages = captures.map(c => ({
+                        ...c,
+                        imageData: null // No guardar las imágenes
+                    }));
+                    localStorage.setItem('hexCaptures', JSON.stringify(capturesWithoutImages));
+                }
+            }
         }
         
         // Cargar capturas desde localStorage
@@ -1175,6 +1324,7 @@
         window.generateQRCodeForItem = generateQRCodeForItem;
         window.removeHistoryItem = removeHistoryItem;
         window.editHistoryItem = editHistoryItem;
+        window.showImageModal = showImageModal;
     </script>
 </body>
 </html>

@@ -395,6 +395,17 @@
                 max-width: 100%;
             }
         }
+
+        /* Añadir animación de flash para captura */
+        .flash {
+            animation: flash-animation 0.3s;
+        }
+        
+        @keyframes flash-animation {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; background-color: white; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -508,6 +519,141 @@
             // Configurar worker de Tesseract.js
             initTesseract();
         });
+
+        // =========== FUNCIONES PARA INDEXEDDB (NUEVAS) ===========
+
+        // Abrir la base de datos de imágenes
+        function openImagesDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('captureImagesDB', 1);
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('images')) {
+                        db.createObjectStore('images', { keyPath: 'id' });
+                    }
+                };
+                
+                request.onsuccess = (event) => {
+                    resolve(event.target.result);
+                };
+                
+                request.onerror = (event) => {
+                    console.error('Error al abrir la base de datos IndexedDB', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        }
+
+        // Guardar una imagen en IndexedDB
+        async function saveImageToIndexedDB(id, imageData) {
+            try {
+                const db = await openImagesDB();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['images'], 'readwrite');
+                    const store = transaction.objectStore('images');
+                    
+                    const request = store.put({ id, imageData });
+                    
+                    request.onsuccess = () => resolve(true);
+                    request.onerror = (event) => {
+                        console.error('Error al guardar imagen en IndexedDB', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error('Error en saveImageToIndexedDB:', error);
+                return false;
+            }
+        }
+
+        // Obtener una imagen de IndexedDB
+        async function getImageFromIndexedDB(id) {
+            try {
+                const db = await openImagesDB();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['images'], 'readonly');
+                    const store = transaction.objectStore('images');
+                    
+                    const request = store.get(id);
+                    
+                    request.onsuccess = (event) => {
+                        const result = event.target.result;
+                        resolve(result ? result.imageData : null);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error('Error al obtener imagen de IndexedDB', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error('Error en getImageFromIndexedDB:', error);
+                return null;
+            }
+        }
+
+        // Eliminar una imagen de IndexedDB
+        async function deleteImageFromIndexedDB(id) {
+            try {
+                const db = await openImagesDB();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['images'], 'readwrite');
+                    const store = transaction.objectStore('images');
+                    
+                    const request = store.delete(id);
+                    
+                    request.onsuccess = () => resolve(true);
+                    request.onerror = (event) => {
+                        console.error('Error al eliminar imagen de IndexedDB', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error('Error en deleteImageFromIndexedDB:', error);
+                return false;
+            }
+        }
+
+        // Eliminar todas las imágenes de IndexedDB
+        async function clearImagesFromIndexedDB() {
+            try {
+                const db = await openImagesDB();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['images'], 'readwrite');
+                    const store = transaction.objectStore('images');
+                    
+                    const request = store.clear();
+                    
+                    request.onsuccess = () => resolve(true);
+                    request.onerror = (event) => {
+                        console.error('Error al limpiar imágenes de IndexedDB', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error('Error en clearImagesFromIndexedDB:', error);
+                return false;
+            }
+        }
+
+        // Cargar miniatura de imagen desde IndexedDB
+        async function loadImageThumbnail(id) {
+            try {
+                const imageData = await getImageFromIndexedDB(id);
+                if (imageData) {
+                    // Buscar el contenedor de la miniatura
+                    const container = document.querySelector(`.history-thumbnail-container[data-id="${id}"]`);
+                    if (container) {
+                        container.innerHTML = `<img src="${imageData}" class="history-thumbnail" onclick="showImageModal('${id}')" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; cursor: pointer;">`;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error al cargar miniatura para ID ${id}:`, error);
+            }
+        }
+
+        // =========== FIN DE FUNCIONES PARA INDEXEDDB ===========
         
         // Inicializar Tesseract para OCR
         function initTesseract() {
@@ -850,8 +996,8 @@
             }
         }
         
-// Pre-procesar la imagen para mejorar el OCR
-function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
+        // Pre-procesar la imagen para mejorar el OCR
+        function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             const ctx = canvas.getContext('2d');
             
             // Primer paso: Aumentar el tamaño para mejorar la resolución
@@ -1009,7 +1155,7 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             return processed;
         }
         
-        // Manejar cadena hexadecimal válida
+        // Manejar cadena hexadecimal válida (MODIFICADA PARA USAR INDEXEDDB)
         function handleValidHexCode(hexCode, imageData) {
             const number = referenceNumber.value.trim();
             const timestamp = new Date().toISOString();
@@ -1019,16 +1165,16 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
                 number: number,
                 hexCode: hexCode,
                 timestamp: timestamp,
-                imageData: imageData // Guardar la imagen capturada
+                hasImage: !!imageData // Indicador de si hay imagen disponible
             };
             
             if (currentEditingId) {
                 // Estamos editando una captura existente
                 const index = captures.findIndex(c => c.id === currentEditingId);
                 if (index !== -1) {
-                    // Preservar la imagen original si no hay una nueva
-                    if (!imageData && captures[index].imageData) {
-                        capture.imageData = captures[index].imageData;
+                    // Preservar el indicador de imagen si no hay una nueva
+                    if (!imageData && captures[index].hasImage) {
+                        capture.hasImage = captures[index].hasImage;
                     }
                     captures[index] = capture;
                     updateStatus(`Captura #${currentEditingId} actualizada`, 'success');
@@ -1036,11 +1182,32 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
                     // Si no encontramos la captura, la añadimos como nueva
                     captures.unshift(capture);
                 }
+                
+                // Si hay nueva imagen, guardarla en IndexedDB
+                if (imageData) {
+                    saveImageToIndexedDB(capture.id, imageData)
+                        .then(success => {
+                            if (!success) {
+                                console.warn('No se pudo guardar la imagen en IndexedDB');
+                            }
+                        });
+                }
+                
                 // Resetear modo edición
                 currentEditingId = null;
             } else {
                 // Nueva captura
                 captures.unshift(capture);
+                
+                // Guardar imagen en IndexedDB si existe
+                if (imageData) {
+                    saveImageToIndexedDB(capture.id, imageData)
+                        .then(success => {
+                            if (!success) {
+                                console.warn('No se pudo guardar la imagen en IndexedDB');
+                            }
+                        });
+                }
             }
             
             saveCapturesToStorage();
@@ -1119,8 +1286,8 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             }
         }
         
-        // Iniciar edición de captura
-        function startEditCapture() {
+        // Iniciar edición de captura (MODIFICADA PARA USAR INDEXEDDB)
+        async function startEditCapture() {
             const captureId = resultText.getAttribute('data-capture-id');
             if (!captureId) return;
             
@@ -1131,7 +1298,7 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             // Preparar el formulario de edición
             currentEditingId = id;
             
-            // Crear contenido de edición
+            // Crear contenido de edición básico
             let formContent = `
                 <div class="edit-form">
                     <div class="form-group">
@@ -1147,11 +1314,18 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
                     </div>`;
             
             // Añadir imagen de vista previa si está disponible
-            if (capture.imageData) {
-                formContent += `
-                    <div class="form-group">
-                        <img src="${capture.imageData}" alt="Imagen de captura" class="capture-preview">
-                    </div>`;
+            if (capture.hasImage) {
+                try {
+                    const imageData = await getImageFromIndexedDB(id);
+                    if (imageData) {
+                        formContent += `
+                            <div class="form-group">
+                                <img src="${imageData}" alt="Imagen de captura" class="capture-preview">
+                            </div>`;
+                    }
+                } catch (error) {
+                    console.error('Error al cargar imagen para edición:', error);
+                }
             }
             
             // Botones de acción
@@ -1200,7 +1374,7 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
                 number: number,
                 hexCode: hexCode,
                 timestamp: new Date().toISOString(),
-                imageData: existingCapture ? existingCapture.imageData : null
+                hasImage: existingCapture ? existingCapture.hasImage : false
             };
             
             // Actualizar en el array
@@ -1246,8 +1420,8 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             updateStatus('Edición cancelada', 'info');
         }
         
-        // Actualizar historial de capturas
-        function updateCaptureHistory() {
+        // Actualizar historial de capturas (MODIFICADA PARA USAR INDEXEDDB)
+        async function updateCaptureHistory() {
             if (captures.length === 0) {
                 captureHistory.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No hay capturas todavía</p>';
                 return;
@@ -1266,19 +1440,22 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             headerElement.style.color = '#666';
             captureHistory.appendChild(headerElement);
             
-            captures.forEach(capture => {
+            // Crear elementos del historial
+            for (const capture of captures) {
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 item.setAttribute('data-id', capture.id);
                 
                 const textDisplay = `${capture.number ? capture.number : 'Sin número'}  ${capture.hexCode}`;
                 
-                // Crear contenido del historial con miniatura
+                // Crear contenido del historial
                 let contentHTML = `<div class="history-content" title="${textDisplay}">`;
                 
-                // Añadir miniatura de imagen si está disponible
-                if (capture.imageData) {
-                    contentHTML += `<img src="${capture.imageData}" class="history-thumbnail" onclick="showImageModal('${capture.id}')">`;
+                // Si hay imagen, preparar contenedor para la miniatura
+                if (capture.hasImage) {
+                    contentHTML += `<div class="history-thumbnail-container" data-id="${capture.id}" style="width: 36px; height: 36px; display: inline-block; position: relative; border: 1px solid #ddd; border-radius: 4px;">
+                        <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 20px;">⌛</div>
+                    </div>`;
                 }
                 
                 contentHTML += `<span>${textDisplay}</span></div>`;
@@ -1305,18 +1482,31 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
                 `;
                 
                 captureHistory.appendChild(item);
-            });
+                
+                // Si la captura tiene imagen, cargarla desde IndexedDB
+                if (capture.hasImage) {
+                    loadImageThumbnail(capture.id);
+                }
+            }
         }
         
-        // Mostrar imagen en modal
-        function showImageModal(id) {
+        // Mostrar imagen en modal (MODIFICADA PARA USAR INDEXEDDB)
+        async function showImageModal(id) {
             id = parseInt(id, 10);
-            const capture = captures.find(c => c.id === id);
-            if (!capture || !capture.imageData) return;
-            
-            modalImage.src = capture.imageData;
-            modalImage.setAttribute('data-id', id);
-            imageModal.style.display = 'flex';
+            try {
+                const imageData = await getImageFromIndexedDB(id);
+                if (!imageData) {
+                    updateStatus('No se pudo cargar la imagen', 'error');
+                    return;
+                }
+                
+                modalImage.src = imageData;
+                modalImage.setAttribute('data-id', id);
+                imageModal.style.display = 'flex';
+            } catch (error) {
+                console.error('Error al mostrar imagen en modal:', error);
+                updateStatus('Error al cargar la imagen', 'error');
+            }
         }
         
         // Editar un elemento específico del historial
@@ -1342,14 +1532,26 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             startEditCapture();
         }
         
-        // Eliminar un elemento específico del historial
-        function removeHistoryItem(id) {
+        // Eliminar un elemento específico del historial (MODIFICADA PARA USAR INDEXEDDB)
+        async function removeHistoryItem(id) {
             if (confirm('¿Está seguro que desea eliminar esta entrada del historial?')) {
                 // Convertir a número por si acaso
                 id = parseInt(id, 10);
                 
+                // Obtener la captura antes de eliminarla
+                const capture = captures.find(c => c.id === id);
+                
                 // Filtrar para quitar el elemento con ese ID
                 captures = captures.filter(capture => capture.id !== id);
+                
+                // Si tenía imagen, eliminarla de IndexedDB
+                if (capture && capture.hasImage) {
+                    try {
+                        await deleteImageFromIndexedDB(id);
+                    } catch (error) {
+                        console.error('Error al eliminar imagen de IndexedDB:', error);
+                    }
+                }
                 
                 saveCapturesToStorage();
                 updateCaptureHistory();
@@ -1368,9 +1570,16 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             }
         }
         
-        // Eliminar historial de capturas
-        function clearHistory() {
+        // Eliminar historial de capturas (MODIFICADA PARA USAR INDEXEDDB)
+        async function clearHistory() {
             if (confirm('¿Está seguro de que desea eliminar todo el historial de capturas?')) {
+                // Limpiar imágenes de IndexedDB
+                try {
+                    await clearImagesFromIndexedDB();
+                } catch (error) {
+                    console.error('Error al limpiar imágenes de IndexedDB:', error);
+                }
+                
                 captures = [];
                 saveCapturesToStorage();
                 updateCaptureHistory();
@@ -1435,22 +1644,10 @@ function preprocessImage(canvas, scaleFactor = 4.0, thresholdOffset = -10) {
             updateStatus('Archivo descargado', 'success');
         }
         
-        // Guardar capturas en localStorage
+        // Guardar capturas en localStorage (MODIFICADA PARA USAR INDEXEDDB PARA IMÁGENES)
         function saveCapturesToStorage() {
-            // Almacenar capturas localmente
-            try {
-                localStorage.setItem('hexCaptures', JSON.stringify(captures));
-            } catch (e) {
-                // Si ocurre un error (posiblemente por tamaño excesivo), intentar sin imágenes
-                if (e.name === 'QuotaExceededError') {
-                    console.warn('Espacio de localStorage excedido, guardando sin imágenes');
-                    const capturesWithoutImages = captures.map(c => ({
-                        ...c,
-                        imageData: null // No guardar las imágenes
-                    }));
-                    localStorage.setItem('hexCaptures', JSON.stringify(capturesWithoutImages));
-                }
-            }
+            // Almacenar solo los metadatos en localStorage (sin imágenes)
+            localStorage.setItem('hexCaptures', JSON.stringify(captures));
         }
         
         // Cargar capturas desde localStorage

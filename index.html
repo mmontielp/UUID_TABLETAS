@@ -95,6 +95,7 @@
             cursor: pointer;
             font-size: 14px;
             transition: background-color 0.3s;
+            min-height: 44px; /* Mínimo para interacción táctil adecuada */
         }
         
         button:hover {
@@ -119,6 +120,7 @@
             padding: 5px 8px;
             font-size: 12px;
             min-width: 30px;
+            min-height: 36px; /* Más pequeño pero aún táctil */
         }
         
         input {
@@ -126,6 +128,8 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             margin-bottom: 10px;
+            min-height: 44px; /* Mínimo para interacción táctil adecuada */
+            font-size: 16px; /* Evitar zoom en iOS */
         }
         
         .input-group {
@@ -238,8 +242,8 @@
         }
         
         .zoom-controls button {
-            width: 30px;
-            height: 30px;
+            width: 40px; /* Agrandado para mejor táctil */
+            height: 40px;
             border-radius: 50%;
             background-color: rgba(255, 255, 255, 0.7);
             border: none;
@@ -250,6 +254,7 @@
             justify-content: center;
             align-items: center;
             color: #00843D;
+            min-height: unset; /* Anular el min-height global */
         }
         
         .zoom-controls button:hover {
@@ -342,6 +347,7 @@
             font-weight: bold;
             color: #aaa;
             cursor: pointer;
+            padding: 5px 10px; /* Área de toque más grande */
         }
         
         .close-modal:hover {
@@ -385,16 +391,6 @@
             background-color: #00843D;
             transition: width 0.3s ease;
         }
-        
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                max-width: 100%;
-            }
-        }
 
         /* Añadir animación de flash para captura */
         .flash {
@@ -405,6 +401,105 @@
             0% { opacity: 1; }
             50% { opacity: 0.5; background-color: white; }
             100% { opacity: 1; }
+        }
+        
+        /* Media queries mejorados para responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                max-width: 45%;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                max-width: 100%;
+            }
+            
+            .camera-container {
+                height: 250px;
+            }
+            
+            .capture-zone {
+                width: 70%; /* Zona más amplia en móviles */
+                height: 50px;
+            }
+            
+            .history-actions {
+                flex-wrap: wrap;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .main-column, .sidebar {
+                padding: 10px;
+            }
+            
+            .camera-container {
+                height: 200px;
+            }
+            
+            .capture-zone {
+                width: 80%;
+                height: 45px;
+            }
+            
+            button {
+                width: 100%; /* Botones a ancho completo en móviles pequeños */
+                margin-bottom: 5px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .history-content {
+                max-width: calc(100% - 40px); /* Menos espacio para acciones */
+            }
+            
+            .history-actions {
+                position: relative;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 3px;
+                margin-top: 5px;
+            }
+            
+            /* Reorganizar el historial en móviles para mejor legibilidad */
+            .history-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            /* Modal más simple en móviles */
+            .modal-content {
+                padding: 10px;
+                max-width: 95%;
+            }
+        }
+        
+        /* Estilos para orientación específica */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .camera-container {
+                height: 180px;
+            }
+            
+            .container {
+                flex-direction: row;
+            }
+            
+            .main-column, .sidebar {
+                max-height: calc(100vh - 20px);
+                overflow-y: auto;
+            }
         }
     </style>
 </head>
@@ -432,7 +527,7 @@
                 <input type="number" id="referenceNumber" placeholder="Número" style="width: 100px; text-align: center;" min="1" max="999">
             </div>
             
-            <div id="progressContainer" class="progress-container hidden">
+            <div id="progressContainer" class="progress-container">
                 <div id="progressBar" class="progress-bar"></div>
             </div>
             
@@ -508,6 +603,9 @@
             initCamera();
             loadCapturesFromStorage();
             addEventListeners();
+            
+            // Ocultar inicialmente la barra de progreso
+            progressContainer.classList.add('hidden');
             
             // Registrar Service Worker para PWA
             if ('serviceWorker' in navigator) {
@@ -655,7 +753,7 @@
 
         // =========== FIN DE FUNCIONES PARA INDEXEDDB ===========
         
-        // Inicializar Tesseract para OCR
+        // Inicializar Tesseract para OCR (CORREGIDO)
         function initTesseract() {
             // Precarga del reconocedor para mayor velocidad
             const workerPromise = Tesseract.createWorker({
@@ -664,6 +762,9 @@
                         const progress = Math.floor(message.progress * 100);
                         updateProgressBar(progress);
                         updateStatus(`Reconociendo texto... ${progress}%`, 'info');
+                    } else if (message.status) {
+                        // Mostrar otros estados también para mejor feedback
+                        updateStatus(`OCR: ${message.status}`, 'info');
                     }
                 },
                 errorHandler: error => {
@@ -700,13 +801,15 @@
             });
         }
         
-        // Actualizar la barra de progreso
+        // Actualizar la barra de progreso (CORREGIDO)
         function updateProgressBar(percent) {
-            if (progressContainer.classList.contains('hidden')) {
-                progressContainer.classList.remove('hidden');
-            }
+            // Asegurar que el contenedor sea visible
+            progressContainer.classList.remove('hidden');
+            
+            // Actualizar el ancho de la barra
             progressBar.style.width = `${percent}%`;
             
+            // Ocultar solo cuando se completa
             if (percent >= 100) {
                 setTimeout(() => {
                     progressContainer.classList.add('hidden');
@@ -809,6 +912,24 @@
                     imageModal.style.display = 'none';
                 }
             });
+            
+            // Eventos de orientación para ajustar la interfaz en cambios de orientación
+            window.addEventListener('orientationchange', adjustLayoutForOrientation);
+            window.addEventListener('resize', adjustLayoutForOrientation);
+        }
+        
+        // Función para ajustar el layout según la orientación del dispositivo
+        function adjustLayoutForOrientation() {
+            // Ajustar altura de la cámara en modo landscape
+            if (window.innerWidth > window.innerHeight && window.innerHeight < 600) {
+                // Estamos en landscape en un dispositivo pequeño
+                document.querySelector('.camera-container').style.height = '180px';
+            } else {
+                // Restaurar altura predeterminada según el ancho
+                const defaultHeight = window.innerWidth < 480 ? '200px' : 
+                                     window.innerWidth < 768 ? '250px' : '300px';
+                document.querySelector('.camera-container').style.height = defaultHeight;
+            }
         }
         
         // Ajustar el zoom de la cámara manualmente
@@ -892,6 +1013,9 @@
                 // Guardar la imagen original antes del procesamiento OCR
                 const originalImage = canvas.toDataURL('image/png');
                 
+                // Mostrar barra de progreso
+                updateProgressBar(0); // Inicializar la barra de progreso
+                
                 // Procesar la imagen con OCR mejorado y multi-intento
                 processEnhancedOCR(canvas, originalImage).finally(() => {
                     // Restablecer el estado de procesamiento
@@ -941,6 +1065,7 @@
             // Si todos los intentos fallaron
             if (!result) {
                 updateStatus(`No se pudo reconocer la cadena hexadecimal después de ${configLevels.length} intentos.`, 'error');
+                progressContainer.classList.add('hidden'); // Ocultar barra de progreso al terminar
             }
         }
         
@@ -1350,7 +1475,7 @@
             updateStatus('Editando captura...', 'info');
         }
         
-        // Guardar edición de captura
+        // Guardar edición de captura (CORREGIDO - USO DEL CAMPO DE EDICIÓN)
         function saveEditCapture() {
             const hexCodeInput = document.getElementById('editHexCode');
             const numberInput = document.getElementById('editNumber');
@@ -1362,7 +1487,7 @@
                 return;
             }
             
-            // Obtener el número de máquina del formulario de edición
+            // Obtener el número de máquina del formulario de edición (CORREGIDO)
             const number = numberInput.value.trim();
             
             // Buscar la captura existente para mantener la imagen
@@ -1371,7 +1496,7 @@
             // Crear objeto actualizado
             const updatedCapture = {
                 id: currentEditingId,
-                number: number,
+                number: number, // Usar el valor del campo de edición
                 hexCode: hexCode,
                 timestamp: new Date().toISOString(),
                 hasImage: existingCapture ? existingCapture.hasImage : false
@@ -1420,7 +1545,7 @@
             updateStatus('Edición cancelada', 'info');
         }
         
-        // Actualizar historial de capturas (MODIFICADA PARA USAR INDEXEDDB)
+        // Actualizar historial de capturas (MODIFICADA PARA USAR INDEXEDDB Y RESPONSIVE)
         async function updateCaptureHistory() {
             if (captures.length === 0) {
                 captureHistory.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No hay capturas todavía</p>';
@@ -1440,7 +1565,7 @@
             headerElement.style.color = '#666';
             captureHistory.appendChild(headerElement);
             
-            // Crear elementos del historial
+            // Crear elementos del historial - ahora cada elemento ocupa todo el ancho
             for (const capture of captures) {
                 const item = document.createElement('div');
                 item.className = 'history-item';
@@ -1448,38 +1573,70 @@
                 
                 const textDisplay = `${capture.number ? capture.number : 'Sin número'}  ${capture.hexCode}`;
                 
-                // Crear contenido del historial
-                let contentHTML = `<div class="history-content" title="${textDisplay}">`;
+                // Verificar si estamos en móvil para ajustar el diseño
+                const isMobile = window.innerWidth <= 480;
                 
-                // Si hay imagen, preparar contenedor para la miniatura
-                if (capture.hasImage) {
-                    contentHTML += `<div class="history-thumbnail-container" data-id="${capture.id}" style="width: 36px; height: 36px; display: inline-block; position: relative; border: 1px solid #ddd; border-radius: 4px;">
-                        <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 20px;">⌛</div>
-                    </div>`;
+                if (isMobile) {
+                    // Diseño para móviles - formato vertical
+                    item.innerHTML = `
+                        <div style="width: 100%;">
+                            <div class="history-content" title="${textDisplay}" style="max-width: 100%; margin-bottom: 5px;">
+                                ${capture.hasImage ? `
+                                <div class="history-thumbnail-container" data-id="${capture.id}" style="width: 36px; height: 36px; display: inline-block; position: relative; border: 1px solid #ddd; border-radius: 4px;">
+                                    <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 20px;">⌛</div>
+                                </div>` : ''}
+                                <span style="overflow: hidden; text-overflow: ellipsis;">${textDisplay}</span>
+                            </div>
+                            <div class="history-actions" style="width: 100%; justify-content: space-between;">
+                                <button class="tooltip action-btn" onclick="copyToClipboard('${textDisplay}')">
+                                    📋
+                                    <span class="tooltiptext">Copiar</span>
+                                </button>
+                                <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}', ${capture.id})">
+                                    🔄
+                                    <span class="tooltiptext">Generar QR</span>
+                                </button>
+                                <button class="tooltip action-btn" onclick="editHistoryItem(${capture.id})">
+                                    ✏️
+                                    <span class="tooltiptext">Editar</span>
+                                </button>
+                                <button class="tooltip action-btn danger" onclick="removeHistoryItem(${capture.id})">
+                                    🗑️
+                                    <span class="tooltiptext">Eliminar</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Diseño para escritorio - formato horizontal
+                    item.innerHTML = `
+                        <div class="history-content" title="${textDisplay}">
+                            ${capture.hasImage ? `
+                            <div class="history-thumbnail-container" data-id="${capture.id}" style="width: 36px; height: 36px; display: inline-block; position: relative; border: 1px solid #ddd; border-radius: 4px;">
+                                <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 20px;">⌛</div>
+                            </div>` : ''}
+                            <span>${textDisplay}</span>
+                        </div>
+                        <div class="history-actions">
+                            <button class="tooltip action-btn" onclick="copyToClipboard('${textDisplay}')">
+                                📋
+                                <span class="tooltiptext">Copiar</span>
+                            </button>
+                            <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}', ${capture.id})">
+                                🔄
+                                <span class="tooltiptext">Generar QR</span>
+                            </button>
+                            <button class="tooltip action-btn" onclick="editHistoryItem(${capture.id})">
+                                ✏️
+                                <span class="tooltiptext">Editar</span>
+                            </button>
+                            <button class="tooltip action-btn danger" onclick="removeHistoryItem(${capture.id})">
+                                🗑️
+                                <span class="tooltiptext">Eliminar</span>
+                            </button>
+                        </div>
+                    `;
                 }
-                
-                contentHTML += `<span>${textDisplay}</span></div>`;
-                
-                item.innerHTML = contentHTML + `
-                    <div class="history-actions">
-                        <button class="tooltip action-btn" onclick="copyToClipboard('${textDisplay}')">
-                            📋
-                            <span class="tooltiptext">Copiar</span>
-                        </button>
-                        <button class="tooltip action-btn" onclick="generateQRCodeForItem('${capture.hexCode}', ${capture.id})">
-                            🔄
-                            <span class="tooltiptext">Generar QR</span>
-                        </button>
-                        <button class="tooltip action-btn" onclick="editHistoryItem(${capture.id})">
-                            ✏️
-                            <span class="tooltiptext">Editar</span>
-                        </button>
-                        <button class="tooltip action-btn danger" onclick="removeHistoryItem(${capture.id})">
-                            🗑️
-                            <span class="tooltiptext">Eliminar</span>
-                        </button>
-                    </div>
-                `;
                 
                 captureHistory.appendChild(item);
                 

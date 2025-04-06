@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Escáner Hexadecimal</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#00843D">
@@ -14,29 +14,40 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         
+        html, body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
         body {
             background-color: #ecf0f1;
             color: #333;
             line-height: 1.6;
             padding: 10px;
-            width: 100%;
             margin: 0;
+            overflow-x: hidden;
         }
         
         .container {
             display: flex;
             flex-wrap: wrap;
             width: 100%;
+            max-width: 100%;
             gap: 20px;
+            overflow: hidden;
         }
         
         .main-column {
             flex: 1;
             min-width: 300px;
+            max-width: 100%;
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 15px;
+            overflow: hidden;
         }
         
         .sidebar {
@@ -47,6 +58,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 15px;
+            overflow: hidden;
         }
         
         .camera-container {
@@ -64,6 +76,13 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            max-width: none;
         }
         
         .capture-zone {
@@ -142,6 +161,7 @@
             background-color: #f9f9f9;
             border-radius: 4px;
             border-left: 4px solid #00843D;
+            overflow-x: hidden;
         }
         
         .qr-container {
@@ -149,16 +169,26 @@
             flex-direction: column;
             align-items: center;
             margin: 20px 0;
+            max-width: 100%;
+            overflow: hidden;
         }
         
         #qrcode {
             margin: 10px 0;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        
+        #qrcode canvas {
+            max-width: 100%;
+            height: auto;
         }
         
         #captureHistory {
             width: 100%;
             max-height: 500px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
         
         .history-item {
@@ -169,6 +199,7 @@
             align-items: center;
             font-size: 14px;
             width: 100%;
+            overflow: hidden;
         }
         
         .history-item:last-child {
@@ -284,7 +315,7 @@
         }
         
         .hidden {
-            display: none;
+            display: none !important;
         }
         
         .edit-result-container {
@@ -296,10 +327,12 @@
             padding: 15px;
             border-radius: 8px;
             margin-top: 10px;
+            overflow-x: hidden;
         }
         
         .form-group {
             margin-bottom: 15px;
+            max-width: 100%;
         }
         
         .form-group label {
@@ -403,6 +436,29 @@
             100% { opacity: 1; }
         }
         
+        /* Fix para iOS y viewport */
+        @supports (-webkit-touch-callout: none) {
+            body, .container, .main-column, .sidebar, 
+            .result-container, .qr-container, #qrcode,
+            .history-item, .edit-form, .form-group {
+                max-width: 100vw;
+                overflow-x: hidden;
+            }
+            
+            #qrcode canvas, .modal-image, .capture-preview {
+                max-width: 100%;
+                height: auto !important;
+                width: auto !important;
+            }
+            
+            /* Prevenir scroll horizontal en iPhone */
+            .camera-container, #video {
+                width: 100%;
+                max-width: 100vw;
+                overflow: hidden;
+            }
+        }
+        
         /* Media queries mejorados para responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -499,6 +555,28 @@
             .main-column, .sidebar {
                 max-height: calc(100vh - 20px);
                 overflow-y: auto;
+            }
+        }
+        
+        /* Correcciones específicas para iPhone */
+        @media screen and (device-width: 390px) and (device-height: 844px),
+               screen and (device-width: 428px) and (device-height: 926px),
+               screen and (device-width: 375px) and (device-height: 812px),
+               screen and (device-width: 414px) and (device-height: 896px) {
+            .main-column, .sidebar, .qr-container, #qrcode {
+                max-width: 100%;
+                width: 100%;
+            }
+            
+            #qrcode canvas {
+                max-width: 100%;
+                height: auto !important;
+            }
+            
+            .result-container, .edit-form, 
+            .history-item, .history-content {
+                max-width: 100%;
+                overflow-x: hidden;
             }
         }
     </style>
@@ -616,6 +694,11 @@
             
             // Configurar worker de Tesseract.js
             initTesseract();
+            
+            // Prevenir zoom en iOS
+            document.addEventListener('gesturestart', function(e) {
+                e.preventDefault();
+            });
         });
 
         // =========== FUNCIONES PARA INDEXEDDB (NUEVAS) ===========
@@ -916,6 +999,18 @@
             // Eventos de orientación para ajustar la interfaz en cambios de orientación
             window.addEventListener('orientationchange', adjustLayoutForOrientation);
             window.addEventListener('resize', adjustLayoutForOrientation);
+            
+            // Específico para iOS - evitar el desbordamiento
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                window.addEventListener('resize', preventOverflow);
+                preventOverflow(); // Llamar inicialmente
+            }
+        }
+        
+        // Función para prevenir el desbordamiento en iOS
+        function preventOverflow() {
+            document.documentElement.style.width = window.innerWidth + 'px';
+            document.body.style.width = window.innerWidth + 'px';
         }
         
         // Función para ajustar el layout según la orientación del dispositivo
@@ -929,6 +1024,16 @@
                 const defaultHeight = window.innerWidth < 480 ? '200px' : 
                                      window.innerWidth < 768 ? '250px' : '300px';
                 document.querySelector('.camera-container').style.height = defaultHeight;
+            }
+            
+            // Asegurar que el QR code no se desborde
+            const qrContainer = document.getElementById('qrcode');
+            if (qrContainer && qrContainer.firstChild && qrContainer.firstChild.tagName === 'CANVAS') {
+                const canvas = qrContainer.firstChild;
+                if (canvas.width > qrContainer.offsetWidth) {
+                    canvas.style.width = '100%';
+                    canvas.style.height = 'auto';
+                }
             }
         }
         
@@ -1346,10 +1451,13 @@
             showResult(hexCode, number, capture.id);
             generateQRCode(hexCode);
             
+            // Ajustar layout después de generar el QR
+            setTimeout(adjustLayoutForOrientation, 100);
+            
             updateStatus(`Código hexadecimal capturado con éxito: ${hexCode}`, 'success');
         }
         
-        // Generar código QR
+        // Generar código QR (MODIFICADO PARA iOS)
         function generateQRCode(text) {
             // Asegurar que el contenedor esté vacío
             qrcodeContainer.innerHTML = '';
@@ -1359,11 +1467,15 @@
                 const canvas = document.createElement('canvas');
                 qrcodeContainer.appendChild(canvas);
                 
+                // Obtener el ancho disponible para el QR
+                const containerWidth = qrcodeContainer.clientWidth;
+                const qrSize = Math.min(containerWidth, 200); // No más de 200px o el ancho del contenedor
+                
                 // Generar QR con configuración visible
                 QRCode.toCanvas(canvas, text, {
-                    width: 200,
-                    height: 200,
-                    margin: 2,
+                    width: qrSize,
+                    height: qrSize,
+                    margin: 1,
                     color: {
                         dark: '#000000',
                         light: '#ffffff'
@@ -1373,6 +1485,10 @@
                     if (error) {
                         console.error('Error al generar QR:', error);
                         qrcodeContainer.innerHTML = '<p style="color: red;">Error al generar código QR</p>';
+                    } else {
+                        // Asegurar que el canvas no desborde en iOS
+                        canvas.style.maxWidth = '100%';
+                        canvas.style.height = 'auto';
                     }
                 });
                 
@@ -1381,6 +1497,8 @@
                 label.style.fontFamily = 'monospace';
                 label.style.marginTop = '10px';
                 label.style.wordBreak = 'break-all';
+                label.style.maxWidth = '100%';
+                label.style.overflow = 'hidden';
                 label.textContent = text;
                 qrcodeContainer.appendChild(label);
                 
@@ -1524,6 +1642,12 @@
             if (editBtn) editBtn.style.display = 'block';
             
             updateStatus('Captura actualizada correctamente', 'success');
+            
+            // Asegurar que no haya desbordamiento en iOS
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                setTimeout(preventOverflow, 100);
+                setTimeout(adjustLayoutForOrientation, 200);
+            }
         }
         
         // Cancelar edición de captura
@@ -1660,6 +1784,10 @@
                 modalImage.src = imageData;
                 modalImage.setAttribute('data-id', id);
                 imageModal.style.display = 'flex';
+                
+                // Asegurar que la imagen no se desborde
+                modalImage.style.maxWidth = '100%';
+                modalImage.style.height = 'auto';
             } catch (error) {
                 console.error('Error al mostrar imagen en modal:', error);
                 updateStatus('Error al cargar la imagen', 'error');
@@ -1760,6 +1888,12 @@
                 showResult(hexCode, '', null);
                 generateQRCode(hexCode);
                 resultContainer.scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            // Ajustar layout después de generar el QR para iOS
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                setTimeout(preventOverflow, 100);
+                setTimeout(adjustLayoutForOrientation, 200);
             }
         }
         

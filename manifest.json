@@ -1,7 +1,7 @@
 {
-    "name": "Escáner Hexadecimal",
-    "short_name": "HexScan",
-    "description": "Captura códigos hexadecimales con OCR avanzado",
+    "name": "UUID Tabletas",
+    "short_name": "UUID",
+    "description": "UUID-Tabletas",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#ffffff",
@@ -9,13 +9,13 @@
     "orientation": "any",
     "icons": [
       {
-        "src": "icon-192x192.png",
+        "src": "icons/icon-192x192.png",
         "sizes": "192x192",
         "type": "image/png",
         "purpose": "any maskable"
       },
       {
-        "src": "icon-512x512.png",
+        "src": "icons/icon-512x512.png",
         "sizes": "512x512",
         "type": "image/png",
         "purpose": "any maskable"
@@ -25,7 +25,7 @@
       {
         "name": "Nuevo escaneo",
         "url": "./index.html?action=scan",
-        "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+        "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
       }
     ]
   }

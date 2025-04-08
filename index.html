@@ -920,6 +920,7 @@
                 
                 videoStream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = videoStream;
+                
 // Intentar maximizar el zoom programáticamente después de obtener el stream
 try {
                     const videoTrack = videoStream.getVideoTracks()[0];
@@ -1140,9 +1141,8 @@ try {
                 captureBtn.disabled = false;
             }
         }
-        
-        // Procesamiento OCR mejorado con múltiples intentos
-        async function processEnhancedOCR(canvas, originalImage) {
+// Procesamiento OCR mejorado con múltiples intentos
+async function processEnhancedOCR(canvas, originalImage) {
             // Copiar el canvas para preservar la imagen original entre intentos
             const originalCanvas = document.createElement('canvas');
             originalCanvas.width = canvas.width;
@@ -1179,8 +1179,9 @@ try {
                 progressContainer.classList.add('hidden'); // Ocultar barra de progreso al terminar
             }
         }
-// Realizar OCR con una configuración específica
-async function performOCRWithConfig(canvas, config, originalImage) {
+        
+        // Realizar OCR con una configuración específica
+        async function performOCRWithConfig(canvas, config, originalImage) {
             try {
                 // Pre-procesar la imagen con los parámetros específicos
                 preprocessImage(canvas, config.scaleFactor, config.threshold);
@@ -1302,9 +1303,8 @@ async function performOCRWithConfig(canvas, config, originalImage) {
             
             ctx.putImageData(imageData, 0, 0);
         }
-        
-        // Aplicar umbral adaptativo con offset configurable
-        function applyAdaptiveThreshold(canvas, thresholdOffset = -10) {
+// Aplicar umbral adaptativo con offset configurable
+function applyAdaptiveThreshold(canvas, thresholdOffset = -10) {
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
@@ -1389,8 +1389,9 @@ async function performOCRWithConfig(canvas, config, originalImage) {
             
             return processed;
         }
-// Manejar cadena hexadecimal válida (MODIFICADA PARA USAR INDEXEDDB)
-function handleValidHexCode(hexCode, imageData) {
+        
+        // Manejar cadena hexadecimal válida (MODIFICADA PARA USAR INDEXEDDB)
+        function handleValidHexCode(hexCode, imageData) {
             const number = referenceNumber.value.trim();
             const timestamp = new Date().toISOString();
             
@@ -1461,9 +1462,8 @@ function handleValidHexCode(hexCode, imageData) {
             
             updateStatus(`Código hexadecimal capturado con éxito: ${hexCode}`, 'success');
         }
-        
-        // Generar código QR (MODIFICADO PARA iOS)
-        function generateQRCode(text) {
+// Generar código QR (MODIFICADO PARA iOS)
+function generateQRCode(text) {
             // Asegurar que el contenedor esté vacío
             qrcodeContainer.innerHTML = '';
             
@@ -1597,8 +1597,9 @@ function handleValidHexCode(hexCode, imageData) {
             
             updateStatus('Editando captura...', 'info');
         }
-// Guardar edición de captura (CORREGIDO - USO DEL CAMPO DE EDICIÓN)
-function saveEditCapture() {
+        
+        // Guardar edición de captura (CORREGIDO - USO DEL CAMPO DE EDICIÓN)
+        function saveEditCapture() {
             const hexCodeInput = document.getElementById('editHexCode');
             const numberInput = document.getElementById('editNumber');
             
@@ -1653,9 +1654,8 @@ function saveEditCapture() {
                 setTimeout(adjustLayoutForOrientation, 200);
             }
         }
-        
-        // Cancelar edición de captura
-        function cancelEditCapture() {
+// Cancelar edición de captura
+function cancelEditCapture() {
             const capture = captures.find(c => c.id === currentEditingId);
             if (capture) {
                 showResult(capture.hexCode, capture.number, capture.id);
@@ -1774,8 +1774,9 @@ function saveEditCapture() {
                 }
             }
         }
-// Mostrar imagen en modal (MODIFICADA PARA USAR INDEXEDDB)
-async function showImageModal(id) {
+        
+        // Mostrar imagen en modal (MODIFICADA PARA USAR INDEXEDDB)
+        async function showImageModal(id) {
             id = parseInt(id, 10);
             try {
                 const imageData = await getImageFromIndexedDB(id);
@@ -1796,9 +1797,8 @@ async function showImageModal(id) {
                 updateStatus('Error al cargar la imagen', 'error');
             }
         }
-        
-        // Editar un elemento específico del historial
-        function editHistoryItem(id) {
+// Editar un elemento específico del historial
+function editHistoryItem(id) {
             // Convertir a número por si acaso
             id = parseInt(id, 10);
             
@@ -1950,7 +1950,7 @@ async function showImageModal(id) {
             return bytes.buffer;
         }
         
-        // NUEVA FUNCIÓN: Descargar capturas como Excel con ExcelJS - MODIFICADA PARA USAR IMÁGENES ORIGINALES
+        // NUEVA FUNCIÓN: Descargar capturas como Excel con ExcelJS - MODIFICADA PARA TAMAÑOS ESPECÍFICOS
         async function downloadCapturesAsExcel() {
             if (captures.length === 0) {
                 updateStatus('No hay capturas para exportar', 'error');
@@ -1976,15 +1976,15 @@ async function showImageModal(id) {
                 worksheet.columns = [
                     { header: 'Número de Máquina', key: 'machine', width: 15 },
                     { header: 'Código Hexadecimal', key: 'hexcode', width: 20 },
-                    { header: 'Imagen', key: 'image', width: 60 } // Columna más ancha para imágenes
+                    { header: 'Imagen', key: 'image', width: 40 } // Columna para imágenes
                 ];
                 
-                // Formato para el encabezado
-                worksheet.getRow(1).font = { bold: true, size: 12 };
+                // Formato para el encabezado - tamaño de fuente 14
+                worksheet.getRow(1).font = { bold: true, size: 14 };
                 worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
                 
-                // Altura de filas para acomodar imágenes
-                worksheet.properties.defaultRowHeight = 250; // Mayor altura para imágenes originales
+                // Altura de filas para acomodar imágenes de 1.5cm
+                worksheet.properties.defaultRowHeight = 45; // Aproximadamente 1.5cm
                 
                 // Agregar cada captura como una fila
                 let rowCount = 2; // Comenzamos en la fila 2 (después del encabezado)
@@ -2002,6 +2002,11 @@ async function showImageModal(id) {
                         image: '' // La imagen se añadirá después si existe
                     });
                     
+                    // Establecer tamaño de fuente 14 para todas las celdas de datos
+                    row.eachCell({ includeEmpty: true }, (cell) => {
+                        cell.font = { size: 14 };
+                    });
+                    
                     // Alinear celdas
                     row.getCell('machine').alignment = { vertical: 'middle', horizontal: 'center' };
                     row.getCell('hexcode').alignment = { vertical: 'middle', horizontal: 'center' };
@@ -2013,7 +2018,7 @@ async function showImageModal(id) {
                             // Obtener imagen de IndexedDB
                             const imageData = await getImageFromIndexedDB(capture.id);
                             if (imageData) {
-                                // Convertir base64 a array buffer directamente sin redimensionar
+                                // Convertir base64 a array buffer
                                 const imageBuffer = base64ToArrayBuffer(imageData);
                                 
                                 // Añadir imagen a la hoja
@@ -2022,10 +2027,10 @@ async function showImageModal(id) {
                                     extension: 'png', // Usar PNG para mantener calidad
                                 });
                                 
-                                // Insertar imagen en la celda (columna 3, fila actual)
+                                // Insertar imagen con tamaño exacto de 6cm x 1.5cm
                                 worksheet.addImage(imageId, {
                                     tl: { col: 2, row: rowCount - 1 }, // Columna C (índice 2)
-                                    br: { col: 3, row: rowCount } // Ajustar dimensiones para cubrir toda la celda
+                                    ext: { width: 227, height: 57 } // 6cm x 1.5cm (aproximadamente 227px x 57px)
                                 });
                             }
                         } catch (error) {

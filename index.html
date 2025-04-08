@@ -647,7 +647,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.3/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     
     <script>
         // Variables globales
@@ -908,7 +909,7 @@
         async function initCamera() {
             try {
                 const constraints = {
-                    video: {
+                        video: {
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
                         facingMode: 'environment',
@@ -1263,9 +1264,8 @@
                 console.log(`Imagen procesada (intento ${ocrAttempt + 1}) disponible en window.processedImage`);
             }
         }
-        
-        // Aplicar un filtro de nitidez para mejorar los bordes
-        function applySharpenFilter(canvas) {
+// Aplicar un filtro de nitidez para mejorar los bordes
+function applySharpenFilter(canvas) {
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
@@ -1535,8 +1535,9 @@
                 editBtn.onclick = startEditCapture;
             }
         }
-// Iniciar edición de captura (MODIFICADA PARA USAR INDEXEDDB)
-async function startEditCapture() {
+        
+        // Iniciar edición de captura (MODIFICADA PARA USAR INDEXEDDB)
+        async function startEditCapture() {
             const captureId = resultText.getAttribute('data-capture-id');
             if (!captureId) return;
             
@@ -1599,8 +1600,8 @@ async function startEditCapture() {
             updateStatus('Editando captura...', 'info');
         }
         
-// Guardar edición de captura (CORREGIDO - USO DEL CAMPO DE EDICIÓN)
-function saveEditCapture() {
+        // Guardar edición de captura (CORREGIDO - USO DEL CAMPO DE EDICIÓN)
+        function saveEditCapture() {
             const hexCodeInput = document.getElementById('editHexCode');
             const numberInput = document.getElementById('editNumber');
             
@@ -1861,9 +1862,8 @@ function saveEditCapture() {
                 updateStatus('Entrada eliminada del historial', 'info');
             }
         }
-        
-        // Eliminar historial de capturas (MODIFICADA PARA USAR INDEXEDDB)
-        async function clearHistory() {
+// Eliminar historial de capturas (MODIFICADA PARA USAR INDEXEDDB)
+async function clearHistory() {
             if (confirm('¿Está seguro de que desea eliminar todo el historial de capturas?')) {
                 // Limpiar imágenes de IndexedDB
                 try {
@@ -1990,7 +1990,17 @@ function saveEditCapture() {
             });
         }
         
-        // NUEVA FUNCIÓN: Descargar capturas como Excel
+        // Función para extraer datos binarios de base64
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64.split(',')[1]);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // NUEVA FUNCIÓN: Descargar capturas como Excel con ExcelJS
         async function downloadCapturesAsExcel() {
             if (captures.length === 0) {
                 updateStatus('No hay capturas para exportar', 'error');
@@ -2000,64 +2010,96 @@ function saveEditCapture() {
             updateStatus('Generando Excel, por favor espere...', 'info');
             
             try {
-                // Crear array de datos para la hoja de Excel
-                const worksheetData = [];
+                // Crear un nuevo libro de Excel
+                const workbook = new ExcelJS.Workbook();
                 
-                // Añadir encabezados
-                worksheetData.push(['Número de Máquina', 'Código Hexadecimal', 'Imagen']);
+                // Metadatos del libro
+                workbook.creator = 'Escáner Hexadecimal';
+                workbook.lastModifiedBy = 'Escáner Hexadecimal';
+                workbook.created = new Date();
+                workbook.modified = new Date();
                 
-                // Procesar cada captura (ordenar cronológicamente)
-                for (const capture of captures) {
-                    // Preparar fila
-                    const row = [
-                        capture.number || '',
-                        capture.hexCode || ''
-                    ];
+                // Añadir una hoja
+                const worksheet = workbook.addWorksheet('Capturas Hexadecimales');
+                
+                // Definir columnas
+                worksheet.columns = [
+                    { header: 'Número de Máquina', key: 'machine', width: 15 },
+                    { header: 'Código Hexadecimal', key: 'hexcode', width: 20 },
+                    { header: 'Imagen', key: 'image', width: 30 }
+                ];
+                
+                // Formato para el encabezado
+                worksheet.getRow(1).font = { bold: true, size: 12 };
+                worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+                
+                // Altura de filas para acomodar imágenes
+                worksheet.properties.defaultRowHeight = 110;
+                
+                // Agregar cada captura como una fila
+                let rowCount = 2; // Comenzamos en la fila 2 (después del encabezado)
+                updateProgressBar(5); // Iniciar barra de progreso
+                
+                for (let i = 0; i < captures.length; i++) {
+                    const capture = captures[i];
+                    const progress = Math.floor(5 + ((i / captures.length) * 90)); // Progreso entre 5% y 95%
+                    updateProgressBar(progress);
                     
-                    // Añadir imagen si existe
+                    // Añadir fila con datos básicos
+                    const row = worksheet.addRow({
+                        machine: capture.number || '',
+                        hexcode: capture.hexCode,
+                        image: '' // La imagen se añadirá después si existe
+                    });
+                    
+                    // Alinear celdas
+                    row.getCell('machine').alignment = { vertical: 'middle', horizontal: 'center' };
+                    row.getCell('hexcode').alignment = { vertical: 'middle', horizontal: 'center' };
+                    row.getCell('image').alignment = { vertical: 'middle', horizontal: 'center' };
+                    
+                    // Si tiene imagen, añadirla
                     if (capture.hasImage) {
                         try {
                             // Obtener imagen de IndexedDB
                             const imageData = await getImageFromIndexedDB(capture.id);
                             if (imageData) {
-                                // Redimensionar para reducir tamaño
-                                const resizedImage = await resizeImageForExcel(imageData);
-                                row.push(resizedImage);
-                            } else {
-                                row.push(''); // Sin imagen
+                                // Redimensionar imagen para Excel
+                                const resizedImage = await resizeImageForExcel(imageData, 120, 90);
+                                
+                                // Convertir base64 a array buffer
+                                const imageBuffer = base64ToArrayBuffer(resizedImage);
+                                
+                                // Añadir imagen a la hoja
+                                const imageId = workbook.addImage({
+                                    buffer: imageBuffer,
+                                    extension: 'jpeg',
+                                });
+                                
+                                // Insertar imagen en la celda (columna 3, fila actual)
+                                worksheet.addImage(imageId, {
+                                    tl: { col: 2, row: rowCount - 1 }, // Columna C (índice 2)
+                                    ext: { width: 120, height: 90 }
+                                });
                             }
                         } catch (error) {
                             console.error('Error al procesar imagen para Excel:', error);
-                            row.push(''); // Sin imagen en caso de error
                         }
-                    } else {
-                        row.push(''); // Sin imagen
                     }
                     
-                    worksheetData.push(row);
+                    rowCount++;
                 }
                 
-                // Crear libro y hoja de Excel
-                const workbook = XLSX.utils.book_new();
-                const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+                // Guardar el archivo
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                saveAs(blob, `capturas-hex-${Date.now()}.xlsx`);
                 
-                // Configurar ancho de columnas
-                worksheet['!cols'] = [
-                    { wch: 15 }, // Ancho para Número Máquina
-                    { wch: 20 }, // Ancho para Código Hexadecimal
-                    { wch: 50 }  // Ancho para Imagen
-                ];
-                
-                // Añadir hoja al libro
-                XLSX.utils.book_append_sheet(workbook, worksheet, 'Capturas Hexadecimales');
-                
-                // Generar y descargar archivo Excel
-                XLSX.writeFile(workbook, `capturas-hex-${Date.now()}.xlsx`);
-                
-                updateStatus('Excel generado y descargado correctamente', 'success');
+                updateProgressBar(100);
+                updateStatus('Excel descargado correctamente', 'success');
             } catch (error) {
                 console.error('Error al generar Excel:', error);
                 updateStatus('Error al generar Excel: ' + error.message, 'error');
+                progressContainer.classList.add('hidden');
             }
         }
         
